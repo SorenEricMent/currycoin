@@ -1,0 +1,33 @@
+# TODO: Replace `my-project` everywhere in this file with your project name.
+name:                my-project
+version:             0.1.0.0
+
+dependencies:
+- base
+
+library:
+  source-dirs: src
+
+executables:
+  my-project-exe:
+    main:                Main.hs
+    source-dirs:         app
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - my-project
+
+tests:
+  my-project-test:
+    main:                Spec.hs
+    source-dirs:         test
+    ghc-options:
+    - -threaded
+    - -rtsopts
+    - -with-rtsopts=-N
+    dependencies:
+    - my-project
+    - tasty
+    - tasty-hunit
