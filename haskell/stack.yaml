@@ -3,3 +3,5 @@ compiler-check: newer-minor
 
 packages:
 - .
+dependencies:
+  - cryptohash-sha256

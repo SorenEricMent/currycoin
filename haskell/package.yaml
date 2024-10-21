@@ -1,15 +1,15 @@
 # TODO: Replace `my-project` everywhere in this file with your project name.
-name:                my-project
+name:                currycoin
 version:             0.1.0.0
 
 dependencies:
 - base
-
+- cryptohash-sha256
 library:
   source-dirs: src
 
 executables:
-  my-project-exe:
+  currycoin-exe:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -17,10 +17,10 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - my-project
+    - currycoin
 
 tests:
-  my-project-test:
+  currycoin-test:
     main:                Spec.hs
     source-dirs:         test
     ghc-options:
@@ -28,6 +28,6 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - my-project
+    - currycoin
     - tasty
     - tasty-hunit
