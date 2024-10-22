@@ -52,11 +52,18 @@ data MerkleTree a = INode Hash (MerkleTree a) (MerkleTree a) |
                     LeafNode Hash a
 
 createMerkleTreeFromList :: (Hashable a) => [a] -> a
-createMerkleTreeFromList = undefined
+    -- INode construct
+
+createMerkleTreeFromList [] = undefined
+    -- Leaf node construct
+createMerkleTreeFromList (x:y:xs) = undefined
+createMerkleTreeFromList (x:xs) = undefined    -- Need to duplicate tx
+
 
 addToMerkleTree :: (Hashable a) => (MerkleTree a) -> a -> (MerkleTree a)
 addToMerkleTree = undefined
 
+-- Example section
 data MerkleTreeExample = MerkleTreeExample B.ByteString
 
 
