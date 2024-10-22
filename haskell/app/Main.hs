@@ -3,6 +3,8 @@ module Main where
 import Lib
 import Crypto.Hash.SHA256
 import qualified Data.ByteString as B
+import System.Entropy (getEntropy)
+import Crypto.Secp256k1
 
 import Data.Word (Word8)
 import Numeric (showHex)

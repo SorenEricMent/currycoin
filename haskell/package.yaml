@@ -6,6 +6,10 @@ dependencies:
 - base
 - cryptohash-sha256
 - bytestring
+- secp256k1-haskell
+- base58-bytestring
+- entropy
+
 library:
   source-dirs: src
 
