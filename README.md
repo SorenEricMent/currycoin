@@ -8,7 +8,7 @@ The template to edit begins below. You can delete this header section once you'v
 
 We will post some additional material to include when you reach the final project stage.
 
-# Insert My Excellent Project Title Here
+# Currycoin
 
 This will be replaced with a very brief (one paragraph, 2-3 sentences) overview of the project.
 
@@ -21,21 +21,24 @@ This project is in fulfillment of the [CPSC 312 2024W1 project requirements](htt
 Our team is:
 
 + Jessie Zhong (student #50544220)
-+ Team Member Name 2 (student # 2): optional awesome nickname 2
-+ Team Member Name 3 (student # 3): optional awesome nickname 3
++ Yunchuan Hu (student # 2):  "Winslow Flandre"
++ Yuteng "Yuuta" Liang (student # 56100415): "Yuuta"
 
-We call ourselves: optional awesome team name.
+We call ourselves: Knights Of the Lambda Calculus
 
-## Acknowledgments
+## Acknowledgment
 
 We surely built on the work of others! Here are resources and people we got support from:
 
++ cryptohash-sha256
++ The Bitcoin Project, BIPs
 + A list of acknowledgments with a brief explanation of support received, e.g.:
   "We used Github Copilot extensively to generate first-pass implementations of chunks of the project that we had specified.
   We then manually adjusted and adapted these to our needs."
 
 ## Product Pitch
 
+Currycoin is a bitcoin alike blockchain
 Replace this with a pitch for your project and the problem it solves. This is your vision for what the project
 would like like as a complete product, ready for awesome action. (Yes, awesomeness seems to be a theme.)
 It may be as short as a couple of paragraphs, or it may be longer. It should **definitely** take less than 4 minutes
@@ -74,6 +77,7 @@ Or:
 
 ## Proof of Concept
 
+We present the proof of concept of our project with an 
 Replace this with a description of your proof-of-concept. This may be as short as a few paragraphs, or it may be longer.
 It should **definitely** take less than 4 minutes to read carefully and thoroughly, though working through and running the
 code may take an extra 4 minutes. (Your guidance and links should make it easy for us to work through the code.)

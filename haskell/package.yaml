@@ -5,6 +5,7 @@ version:             0.1.0.0
 dependencies:
 - base
 - cryptohash-sha256
+- bytestring
 library:
   source-dirs: src
 
