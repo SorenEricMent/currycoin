@@ -11,7 +11,7 @@ dependencies:
 - entropy
 - mtl
 - haskeline
-
+- utf8-string
 library:
   source-dirs: src
 

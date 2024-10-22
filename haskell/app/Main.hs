@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+
 module Main where
 
 import Lib
@@ -5,6 +8,8 @@ import Crypto.Hash.SHA256
 import qualified Data.ByteString as B
 import System.Entropy (getEntropy)
 import Crypto.Secp256k1
+-- https://stackoverflow.com/a/40491001
+import qualified Data.ByteString.UTF8 as BSU
 
 import Data.Word (Word8)
 import Numeric (showHex)
@@ -43,16 +48,15 @@ byteStringToHex :: B.ByteString -> String
 byteStringToHex bs = intercalate "" $ map word8ToHex (B.unpack bs)
 word8ToHex :: Word8 -> String
 word8ToHex w = let hex = showHex w ""
-               in if length hex == 1 then '0' : hex else hex
-	       -- About helper is by ChatGPT, to create human readable hexdigit strings for better visuals.
-	       -- Note: Do NOT use those two function internally beside formatting output! All internal structures should be in ByteString
-	       
+               in if Prelude.length hex == 1 then '0' : hex else hex
+               -- About helper is by ChatGPT, to create human readable hexdigit strings for better visuals.
+               -- Note: Do NOT use those two function internally beside formatting output! All internal structures should be in ByteString
+
 -- Class definition section
 class Hashable a where
-    hash :: a -> Hash
-
-instance Hashable B.ByteString where
-    hash = Crypto.Hash.SHA256.hash
+    serialize :: a -> B.ByteString
+    takeHash :: a -> Hash
+    takeHash = Crypto.Hash.SHA256.hash . serialize
 
 data TxInput = TxInput Hash    -- Previous spendable output
                
@@ -72,17 +76,87 @@ data Block = Block
                    OutCounter
                    [Transaction]                   
 
+-- https://wiki.haskell.org/Data_declaration_with_constraint
+-- https://wiki.haskell.org/Generalised_algebraic_datatype
+-- https://stackoverflow.com/a/40825913: Not a good idea?
+data MerkleTree a where
+    INode :: MerkleTree a -> MerkleTree a -> MerkleTree a
+    LeafNode :: Hashable a => a -> MerkleTree a
 
-data MerkleTree a = INode Hash (MerkleTree a) (MerkleTree a) |
-                    LeafNode Hash a
+instance Show (MerkleTree String) where
+    show = drawMerkleTree
 
-createMerkleTreeFromList :: (Hashable a) => [a] -> a
-    -- INode construct
+-- https://hackage.haskell.org/package/containers-0.5.7.1/docs/src/Data.Tree.html#drawTree
+-- Had to limit it to MerkleTree String instead of MerkleTree a here
+drawMerkleTree :: MerkleTree String -> String
+drawMerkleTree  = unlines . drawMT
+drawMT :: MerkleTree String -> [String]
+drawMT (LeafNode a) = [show a]
+drawMT (INode l r) = "GroupHash" : drawSubTrees [l, r]
+  where
+    drawSubTrees [] = []
+    drawSubTrees [t] =
+        "|" : shift "`- " "   " (drawMT t)
+    drawSubTrees (t:ts) =
+        "|" : shift "+- " "|  " (drawMT t) ++ drawSubTrees ts
+    shift first other = zipWith (++) (first : repeat other)
 
-createMerkleTreeFromList [] = undefined
-    -- Leaf node construct
-createMerkleTreeFromList (x:y:xs) = undefined
-createMerkleTreeFromList (x:xs) = undefined    -- Need to duplicate tx
+-- 'MerkleTree a' requires 'FlexibleInstances' extension
+-- See https://stackoverflow.com/a/25768967
+instance Hashable (MerkleTree a) where
+    serialize (INode a b) = B.append (takeHash a) (takeHash b)
+    -- Not possible? Without GADT
+    serialize (LeafNode a) = serialize a
+
+instance Hashable String where
+    serialize = BSU.fromString
+
+instance Hashable B.ByteString where
+    serialize a = a
+
+-- | Construct a Merkle Tree from a list of hashes.
+-- | [1] => 1|1
+-- |       1   1
+-- | [1, 2] => 1|2
+-- |          1   2
+-- | [1, 2, 3] => 1|2|3|3
+-- |            1|2     3|3
+-- |           1   2   3dup3
+-- | [1, 2, 3, 4] => 1|2|3|4
+-- |               1|2     3|4
+-- |              1   2   3   4
+-- | [1, 2, 3, 4, 5] => 1|2|3|4|5|5|5|5
+-- |              1|2|3|4             5|5|5|5
+-- |            1|2     3|4         5|5 dup 5|5
+-- |           1   2   3   4       5   5
+-- | [1, 2, 3, 4, 5, 6] => 1|2|3|4|5|6|5|6
+-- |                 1|2|3|4             5|6|5|6
+-- |               1|2     3|4         5|6 dup 5|6
+-- |              1   2   3   4       5   6
+-- | [1, 2, 3, 4, 5, 6, 7] => 1|2|3|4|5|6|7|7
+-- |                    1|2|3|4             5|6|7|7
+-- |                  1|2     3|4         5|6     7|7
+-- |                 1   2   3   4       5   6   7dup7
+-- | [1, 2, 3, 4, 5, 6, 7, 8] => 1|2|3|4|5|6|7|8
+-- |                       1|2|3|4             5|6|7|8
+-- |                     1|2     3|4         5|6     7|8
+-- |                    1   2   3   4       5   6   7   8
+
+groupBy2 :: [a] -> [(a, a)]
+groupBy2 [] = []
+groupBy2 [a] = [(a, a)]
+groupBy2 [a, b] = [(a, b)]
+groupBy2 (a:b:xs) = (a, b) : groupBy2 xs
+
+createMerkleTreeFromListInternal :: [MerkleTree a] -> MerkleTree a
+createMerkleTreeFromListInternal [a] = a
+createMerkleTreeFromListInternal as = w
+    where w = createMerkleTreeFromListInternal p
+          p = map (\x -> INode (fst x) (snd x)) g
+          g = groupBy2 as
+
+createMerkleTreeFromList :: (Hashable a) => [a] -> MerkleTree a
+createMerkleTreeFromList = createMerkleTreeFromListInternal . map LeafNode
 
 
 addToMerkleTree :: (Hashable a) => (MerkleTree a) -> a -> (MerkleTree a)
