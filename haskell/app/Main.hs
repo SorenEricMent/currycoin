@@ -1,5 +1,6 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE GADTs #-}
 
 module Main where
 
@@ -158,7 +159,15 @@ createMerkleTreeFromListInternal as = w
 createMerkleTreeFromList :: (Hashable a) => [a] -> MerkleTree a
 createMerkleTreeFromList = createMerkleTreeFromListInternal . map LeafNode
 
-
+proveHashableInclusion :: (Hashable a) =>
+                          a ->       -- Root hash
+                          a ->       -- To be proven inclusion
+                          [Hash] ->  -- Path
+                          Bool
+                          
+proveHashableInclusion x y hs =
+    (takeHash x) == (foldl (\a b -> (takeHash (mconcat [a, (takeHash b)]))) (takeHash y) hs)
+    
 addToMerkleTree :: (Hashable a) => (MerkleTree a) -> a -> (MerkleTree a)
 addToMerkleTree = undefined
 
