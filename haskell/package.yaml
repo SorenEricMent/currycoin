@@ -10,6 +10,7 @@ dependencies:
 - base58-bytestring
 - entropy
 - mtl
+- haskeline
 
 library:
   source-dirs: src

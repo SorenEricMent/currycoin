@@ -12,7 +12,8 @@ import Data.List (intercalate)
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
-
+import System.IO (hFlush, stdout)
+import System.Console.Haskeline
 
 type Hash = B.ByteString
 type Version = B.ByteString
@@ -58,9 +59,12 @@ data TxInput = TxInput Hash    -- Previous spendable output
 data TxOutput = TxOutput Hash Amount
 
 data Transaction = Transaction
-                   TxInput    -- Coinbase
+                   TxInput       -- Coinbase
                    [TxInput]
-                   [TxOutput]
+                   [TxOutput]    -- Technically, in the origial bitcoin format,
+                                 -- There should be only two output:
+                                 -- The spend and the change
+                                 -- But it wouldn't hurt to do a simple extension here
 data Block = Block
                    Version
                    Flag
@@ -89,14 +93,15 @@ data MerkleTreeExample = MerkleTreeExample B.ByteString
 
 shell :: AppState ()
 shell = do
-    liftIO $ putStr "CurryCoin> "
-    command <- liftIO getLine
-
-    case command of
-        "exit" -> do
-            return ()
-        _ -> liftIO $ putStrLn "Unknown command"
-    shell
-
+    liftIO $ runInputT defaultSettings $ do
+        outputStr "CurryCoin> "
+        input <- getInputLine ""
+        case input of
+            Just "exit" -> liftIO $ putStrLn "Exiting..."
+            Just _      -> do
+                liftIO $ putStrLn "Unknown command"
+                liftIO $ evalStateT shell initialState  -- Continue shell
+            Nothing -> return ()  -- If no input is provided
+    -- Credit: ChatGPT replaced readline with haskeline
 main :: IO ()
 main = evalStateT shell initialState
