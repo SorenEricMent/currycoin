@@ -81,8 +81,8 @@ data Block = Block
 -- https://wiki.haskell.org/Generalised_algebraic_datatype
 -- https://stackoverflow.com/a/40825913: Not a good idea?
 data MerkleTree a where
-    INode :: MerkleTree a -> MerkleTree a -> MerkleTree a
-    LeafNode :: Hashable a => a -> MerkleTree a
+    INode :: Hash -> MerkleTree a -> MerkleTree a -> MerkleTree a
+    LeafNode :: Hashable a => Hash -> a -> MerkleTree a
 
 instance Show (MerkleTree String) where
     show = drawMerkleTree
@@ -92,8 +92,8 @@ instance Show (MerkleTree String) where
 drawMerkleTree :: MerkleTree String -> String
 drawMerkleTree  = unlines . drawMT
 drawMT :: MerkleTree String -> [String]
-drawMT (LeafNode a) = [show a]
-drawMT (INode l r) = "GroupHash" : drawSubTrees [l, r]
+drawMT (LeafNode h a) = [show a]
+drawMT (INode h l r) = ("" ++ byteStringToHex h) : drawSubTrees [l, r]
   where
     drawSubTrees [] = []
     drawSubTrees [t] =
@@ -105,9 +105,11 @@ drawMT (INode l r) = "GroupHash" : drawSubTrees [l, r]
 -- 'MerkleTree a' requires 'FlexibleInstances' extension
 -- See https://stackoverflow.com/a/25768967
 instance Hashable (MerkleTree a) where
-    serialize (INode a b) = B.append (takeHash a) (takeHash b)
+    serialize (INode h a b) = B.append (takeHash a) (takeHash b)
     -- Not possible? Without GADT
-    serialize (LeafNode a) = serialize a
+    serialize (LeafNode h a) = serialize a
+    takeHash (INode h a b) = h
+    takeHash (LeafNode h a) = h
 
 instance Hashable String where
     serialize = BSU.fromString
@@ -151,13 +153,15 @@ groupBy2 (a:b:xs) = (a, b) : groupBy2 xs
 
 createMerkleTreeFromListInternal :: [MerkleTree a] -> MerkleTree a
 createMerkleTreeFromListInternal [a] = a
+createMerkleTreeFromListInternal [a, b] = INode h a b
+    where h = takeHash (B.append (takeHash a) (takeHash b))
 createMerkleTreeFromListInternal as = w
     where w = createMerkleTreeFromListInternal p
-          p = map (\x -> INode (fst x) (snd x)) g
+          p = map (\x -> INode (takeHash (B.append (takeHash (fst x)) (takeHash (snd x)))) (fst x) (snd x)) g
           g = groupBy2 as
 
 createMerkleTreeFromList :: (Hashable a) => [a] -> MerkleTree a
-createMerkleTreeFromList = createMerkleTreeFromListInternal . map LeafNode
+createMerkleTreeFromList = createMerkleTreeFromListInternal . map (\x -> LeafNode (takeHash x) x)
 
 proveHashableInclusion :: (Hashable a) =>
                           a ->       -- Root hash
