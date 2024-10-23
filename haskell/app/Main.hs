@@ -92,7 +92,7 @@ instance Show (MerkleTree String) where
 drawMerkleTree :: MerkleTree String -> String
 drawMerkleTree  = unlines . drawMT
 drawMT :: MerkleTree String -> [String]
-drawMT (LeafNode h a) = [show a]
+drawMT (LeafNode h a) = [show a] ++ [" \\ "] ++ [byteStringToHex h]
 drawMT (INode h l r) = ("" ++ byteStringToHex h) : drawSubTrees [l, r]
   where
     drawSubTrees [] = []
@@ -163,14 +163,47 @@ createMerkleTreeFromListInternal as = w
 createMerkleTreeFromList :: (Hashable a) => [a] -> MerkleTree a
 createMerkleTreeFromList = createMerkleTreeFromListInternal . map (\x -> LeafNode (takeHash x) x)
 
+-- Manuall verify the integrity of a MerkleTree
+verifyMerkleTree :: (Hashable a) =>
+                    MerkleTree a ->
+                    Bool
+verifyMerkleTree = undefined
+
+-- Credit: ChatGPT added skewness in generateInclusionProof and proveHashableInclusion for consistent order
+generateInclusionProof :: (Hashable a) =>
+                          MerkleTree a -> 
+                          a ->            -- Element to prove inclusion
+                          Maybe [(Bool, Hash)]  -- (IsRightSibling, SiblingHash)
+generateInclusionProof (LeafNode hsh hble) y = 
+    if (takeHash y) == hsh 
+    then Just []  -- Element found, return empty proof path
+    else Nothing  -- Element not found
+    
+generateInclusionProof (INode hsh lft rht) y =
+    case generateInclusionProof lft y of
+        Just path -> Just (path ++ [(True, takeHash rht)])  -- Right sibling
+        Nothing -> case generateInclusionProof rht y of
+            Just path -> Just (path ++ [(False, takeHash lft)])  -- Left sibling
+            Nothing -> Nothing
+
+-- Verify the inclusion proof
+-- (Bool, Hash): Bool = True if the sibling is on the right, False if on the left
 proveHashableInclusion :: (Hashable a) =>
-                          a ->       -- Root hash
-                          a ->       -- To be proven inclusion
-                          [Hash] ->  -- Path
+                          Hash ->       -- Root hash
+                          a ->          -- Element to prove
+                          [(Bool, Hash)] ->  -- Sibling hashes with left/right info
                           Bool
-                          
-proveHashableInclusion x y hs =
-    (takeHash x) == (foldl (\a b -> (takeHash (mconcat [a, (takeHash b)]))) (takeHash y) hs)
+proveHashableInclusion rootHash y proofPath =
+    let initialHash = takeHash y
+        finalHash = foldl combineHashes initialHash proofPath
+    in finalHash == rootHash
+  where
+    -- Combine the current hash with the sibling hash based on sibling position
+    combineHashes acc (isRight, siblingHash) =
+        if isRight
+        then takeHash (B.append acc siblingHash)  -- Right sibling: append current hash first
+        else takeHash (B.append siblingHash acc)  -- Left sibling: append sibling hash first
+
     
 addToMerkleTree :: (Hashable a) => (MerkleTree a) -> a -> (MerkleTree a)
 addToMerkleTree = undefined
@@ -181,7 +214,7 @@ data MerkleTreeExample = MerkleTreeExample B.ByteString
 shell :: AppState ()
 shell = do
     liftIO $ runInputT defaultSettings $ do
-        outputStr "CurryCoin> "
+        outputStr "CurryCoin> (This shell is not yet used!!! Use GHCi for PoC testing)"
         input <- getInputLine ""
         case input of
             Just "exit" -> liftIO $ putStrLn "Exiting..."
@@ -192,3 +225,22 @@ shell = do
     -- Credit: ChatGPT replaced readline with haskeline
 main :: IO ()
 main = evalStateT shell initialState
+
+
+-- Origial test by ChatGPT (modified)
+testMerkleTree :: [String] -> String -> IO ()
+testMerkleTree elements elementToProve = do
+    let merkleTree = createMerkleTreeFromList elements
+    putStrLn "Merkle Tree Structure:"
+    print merkleTree
+
+    let inclusionProof = generateInclusionProof merkleTree elementToProve
+    case inclusionProof of
+        Nothing -> putStrLn "Element not found in the tree."
+        Just proofPath -> do
+            putStrLn $ "Inclusion Proof for element '" ++ elementToProve ++ "':"
+            mapM_ (\(isRight, hash) -> putStrLn $ (if isRight then "Right: " else "Left:  ") ++ byteStringToHex hash) proofPath
+            let elementToProveBS = BSU.fromString elementToProve
+            let rootHash = takeHash merkleTree
+            let isValid = proveHashableInclusion rootHash elementToProveBS proofPath
+            putStrLn $ "Proof is valid: " ++ show isValid
