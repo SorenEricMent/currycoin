@@ -54,13 +54,13 @@ Our MVP will take advantage of Haskell's functional nature, type safety features
 
 ## Proof of Concept
 
-We present the proof of concept of our project with a haskell implementation of [Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree) and data definitions for key blockchain related concepts (block and transaction).
+We present the proof of concept of our project with a Haskell implementation of [Merkle Tree](https://en.wikipedia.org/wiki/Merkle_tree) and data definitions for key blockchain related concepts (block and transaction).
 
-The Merkle Tree's is one of the foundation of a blockchain - it is essentially how the hash of a block is generated, which is a key part for the proof-of-work consensus, and it allows for Merkle proofs - commitment that a transaction is included in the block.
+The Merkle Tree is one of the foundation of a blockchain - it is essentially how the hash of a block is generated, which is a key part for the proof-of-work consensus, and it allows for Merkle proofs - commitment that a transaction is included in the block.
 
-Beside of this fundamental data structure of blockchain, we also provided data and type definition for key concepts - blocks and transactions.
+Besides this fundamental data structure of blockchain, we also provided data and type definition for key concepts - blocks and transactions.
 
-This gives us the confindence of working towards the minimal viable projects as the rest works are essentially building generation functions that operates on those types and structures.
+This gives us the confidence of working towards the minimal viable project as the rest of the work is essentially building generation functions that operates on those types and structures.
 
 ### How to test our PoC
 <!-- Include links (likely even line-level links, which are easy to create in Github) throughout to critical pieces of
