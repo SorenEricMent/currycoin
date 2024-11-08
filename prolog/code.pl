@@ -2,15 +2,23 @@
 % First, generate two prime number, P and Q
 % Then compute N = PQ
 
-generate_prime(X) :- crypto_generate_prime(16, X, []).
+generate_prime(X) :- crypto_generate_prime(128, X, []).
 
 binded_mult(X, Y, Z) :- Z is X * Y.
 binded_pow(X, Y, Z) := Z is X ** Y.
 binded_mod(X, Y, Z) := Z is X mod Y.
 
+% Efficient modular exponentiation
+% This optimization is by ChatGPT, it is not *necessary* and can be replaced with the simple
+% binded_mod above, but we're having trouble with time complexity and prime beyond 7 bit basically doesn't halt
+mod_exp(Base, Exp, Mod, Result) :-
+    ( Exp =:= 0 -> Result = 1
+    ; Exp mod 2 =:= 1 -> mod_exp(Base, Exp - 1, Mod, Temp), Result is (Temp * Base) mod Mod
+    ; Exp mod 2 =:= 0 -> HalfExp is Exp // 2, mod_exp(Base, HalfExp, Mod, Temp), Result is (Temp * Temp) mod Mod
+    ).
+
 coprime(X, Y) :-
-    D is gcd(X, Y),
-    D == 1.
+    gcd(X, Y) =:= 1.
 
 % Credit: ChatGPT taught me to use findall, really stuck with forall in λ.
 % wow failure driven loop actually
@@ -19,9 +27,10 @@ coprime_list(List, N) :-
     findall(X, (between(1, N, X), coprime(X, N)), List).
 
 pq_generation(P, Q) :-
+    repeat,% P \= Q might falsify
     generate_prime(P),
-    generate_prime(Q).
-
+    generate_prime(Q),
+    P \= Q, !. % Practically they need to be as different as possible but here we just make them different
 
 % Carmichael's totient function
 % a^m congruent to 1 (mod n).
@@ -48,12 +57,20 @@ evaluate(X,R):- R is X.
     % We are essentially saying a^m mod n = 1
     forall(member(A, List),
 	   (
-	       (A ** M) mod N =:= 1
+	       mod_exp(A, M, N, 1)
 	   )), !.
 λ_internal(M, N, R) :- λ_internal(M + 1, N, R).
 % ChatGPT hinted that a cut is needed so the smallest m is preserved.
 % We don't do a halt as existence of M is guanranteed (I won't bother prove that.)
 % Smallest since we begin the search from 1
+
+%%%%% It turns out the above time complexity is too high (But semantically correct!)
+%%%%% and we ACTUALLY need to enbrace the following
+%%%% But it was kept as it definitely looks cool =(
+λ_lcm(P, Q, N) :-
+    P1 is P - 1,
+    Q1 is Q - 1,
+    N is lcm(P, Q).
 
 %% Final generation clause
 % N = modulus = P * Q
@@ -61,4 +78,12 @@ evaluate(X,R):- R is X.
 % D = private exponent
 generate_key(N, E, D, P, Q) :-
     pq_generation(P, Q),
-    binded_mult(P, Q, N).
+    binded_mult(P, Q, N),
+    λ_lcm(P, Q, RN), % Can be replaced with our hand written λ(R, N) but time complexity too high
+    E is 65537, % Pratically,the public exponent is not computed but a constant
+%    between(1, E, LN),
+%   coprime(E, LN),
+    crypto_modular_inverse(E, RN, D),
+    write("Your public exponent: "), writeln(E),
+    write("Your public modulus: "), writeln(N),
+    write("Your private exponent: "), writeln(D).
