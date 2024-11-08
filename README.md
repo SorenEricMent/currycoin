@@ -103,7 +103,7 @@ Note: We expect to be able to test your code by running `stack test`. Included a
 We should be able to further explore your code's functionality by running `stack ghci`, and you should instruct us on some interesting cases to try. -->
 
 ### How to test and run the code: Prolog
-N/A
+See README.pl.md
 <!-- Replace this section with instructions to us for how to test and run your code.
 
 We have set up a simple test file for you to extend using [Prolog Unit Testing](https://www.swi-prolog.org/pldoc/doc_for?object=section(%27packages/plunit.html%27)) library for testing. Included among your tests should be some that demonstrate the core functionality of your code. Please remove the example tests before you submit or you will lose marks. (We will be running `make prolog-eval` from the project root.)
