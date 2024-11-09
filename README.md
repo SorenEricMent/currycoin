@@ -19,7 +19,9 @@ Our team is:
 + Yunchuan Hu (student #90325788):  "Winslow Flandre"
 + Yuteng Liang (student #56100415): "Yuuta"
 
-We call ourselves: __Knights Of the Lambda Calculus__![Knights_of_the_Lambda_Calculus](https://hackmd.io/_uploads/Hy__fKo-1g.png)
+We call ourselves: __Knights Of the Lambda Calculus__
+
+![Knights_of_the_Lambda_Calculus](https://i.ibb.co/9VTSJX1/Knights-of-the-Lambda-Calculus.png)
 
 ## Acknowledgment
 
@@ -27,7 +29,7 @@ We surely built on the work of others! Here are resources and people we got supp
 
 + The Prolog crypto library - they made the ground work much easier with prime generation and multiplicative inverse (we can implement them but with a huge time complexity penalty)
 + ChatGPT, with all contribution marked with commment.
-
++ **R**ivest, **S**hamir, **A**dleman
 ## Product Pitch
 
 RSAndbox is an **educational, RSA cryptography sandbox/toolikt** designed to help eager learners and encryption enthusiasts explore the principles of public-key cryptography in an interactive, sandbox-style environment.
@@ -67,7 +69,7 @@ To generate a RSA key pair, the program has to:
 4. Determine the **public exponent** $e$: It should be a coprime of $\lambda{(n)}$. It is commonly chosen to be $65537$.
 5. Determine the **private exponent** $d \equiv e ^ {-1} (\mod{\lambda{(n)}})$.
 
-Prolog is suitable for the implemention of such an algorithm. Because it is mostly pure mathematical relationships, we can just define the logic predicates in Prolog and let Prolog to find the numbers needed.
+Prolog is suitable for the implemention of such an algorithm. Because it is mostly pure mathematical relationships, we can just define the logic predicates in Prolog and let Prolog to find the numbers needed. And because we only define the relationships between those algebras the semantics of our algorithm is easy to proven sounds as per Prolog's nature.
 The initial $p$ and $q$ can be randomly selected using the Prolog crypto library (`crypto_generate_prime()`). We used key length of 128 in the PoF, but 4096 is also tested to work.
 
 This proof of concept gives us confidence moving forward as it implements the most fundamental and mathmatically complex portion of RSA encrpytion and lays the foundation for building towards the fully functional sandbox environment. Implementing the key generation algorithm is also the most important part of this project.
@@ -97,6 +99,8 @@ generate_prime(X) :- crypto_generate_prime(4096, X, []).
 ```
 
 defines the key length to be 128bits. This value can be changed to other desirable key lengths (like 4096).
+
+You can also run some substeps, like, coprime_list(List, N), which generate a list of all coprimes to N from 1. for Carmichael's totient function, we specially wrote two implementations: one is a translation of the equation to prolog (λ(Result, N)), one is the analytics implementation specifcally for RSA's case with a much better time complexity (the former is too high for anything past 7 bit), that is λ_lcm(P, Q, N).
 
 ### How to test and run the code: Prolog
 N/A. The standard Prolog installation is sufficient. 
