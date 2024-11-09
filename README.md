@@ -92,4 +92,5 @@ generate_prime(X) :- crypto_generate_prime(4096, X, []).
 defines the key length to be 128bits. This value can be changed to other desirable key lengths (like 4096).
 
 ### How to test and run the code: Prolog
-N/A. The standard Prolog installation is sufficient.
+N/A. The standard Prolog installation is sufficient. 
+Simply `swipl code.pl` inside the `/prolog` folder. 
