@@ -30,15 +30,22 @@ We surely built on the work of others! Here are resources and people we got supp
 
 ## Product Pitch
 
-RSAndbox is an **educational, RS cryptography toolkit** designed to help eager learners and encryption enthusiasts explore the principles of public-key cryptography in an interactive, sandbox-style environment.
+RSAndbox is an **educational, RSA cryptography sandbox/toolikt** designed to help eager learners and encryption enthusiasts explore the principles of public-key cryptography in an interactive, sandbox-style environment.
 
-While many implementations of RSA exist, they often treat the intricate relations between key encrpytion, messages and mathmatical operations as a "**black box**". By expressing RSA operations as **logical predicates**, RSAndbox makes these relationships **explicit and explorable**.
+While many implementations of RSA exist, they often treat the underlying **mathmatical operations and algorithm** (such as prime selection) behind key/message encryption as a "**black box**" of sorts. While learners may be able to understand **use** RSA, they miss out and the **how** and **why**; this is something RSAndbox trys to amend.
 
-The fully realized final product would provide users with an interface to generate RSA keys, sign messages, verify signatures, encrypt messages, and decrypt messages. This would provide users a **full and useful** RSA implementation that implements the most useful features of asymmetric encryption based on RSA.
+Our goal is is to demystify the core processes behind RSA by breaking down it's components into understandable pieces. By expressing RSA operations as **logical predicates**, RSAndbox makes these relationships **explicit and explorable** through Prolog's powerful constraint system and logical predicates. Users can intuitively test inputs and outputs and visualize the logical constraints that govern RSA.
+
+On top of building upon the framework layed by our MVP and PoC, the final product would also likely include:
+
+* The ability to  **encrypt** and **decrypt** messages to demonstrate how plain messages are transformed into cipher and back
+* A **visual GUI component** for lower barrier to entry and step-by-step intuitive feedback
+* Simulate common RSA **vulnerabilities** like low exponent or small prime factor attacks <!-- ChatGPT suggestion -->
+* **Guided practice** through forms of quizzing and problem solving exercises
 
 ## Minimal Viable Project
 
-For our MVP, we plan to implement **peer-to-peer message signing and verification** using RSA digital signatures. This (along with the key generation from the PoC) would provide a **minimal** but **fundamental implemntation** of RSA encryption that could serve as a basis for further expansion. The interfaces implemented fufill core parts of the RSA public key framework without the complete suite of encryption features.
+For our MVP, we plan to implement **peer-to-peer message signing and verification** using RSA digital signatures. This (along with the key generation from the PoC) would provide a **minimal** but **fundamental implemntation** of RSA cryptosystem that could serve as a basis for further expansion. The interfaces implemented fufill core parts of the RSA public key framework without the complete suite of encryption features.
 
 Key elements include:
 
