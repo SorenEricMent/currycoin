@@ -3,3 +3,4 @@
 /dist-newstyle
 *.cabal
 /.obsidian
+secp256k1_dist
