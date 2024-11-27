@@ -25,6 +25,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
 import System.IO (hFlush, stdout)
 import System.Console.Haskeline
+import Data.Maybe (listToMaybe)
 
 type Hash = B.ByteString
 type Version = B.ByteString
@@ -42,6 +43,7 @@ data GlobalState = GlobalState {
 
 -- The Times 03/Jan/2009 Chancellor on brink of second bailout for banks
 initialState = GlobalState {
+    block = [],
     txPool = [],
     utxo = []
 }
@@ -52,6 +54,12 @@ type AppState = StateT GlobalState IO
 flagConst = B.pack [0, 0, 0, 0] -- Constant of 0000 because we don't support SegWit
 
 -- Helper function section
+(!?) :: [a] -> Int -> Maybe a
+xs !? n
+  | n < 0 = Nothing
+  | otherwise = listToMaybe (drop n xs)
+-- Provided by haskell-base >= 4.20, can't get it installed on Archlinux
+
 byteStringToHex :: B.ByteString -> String
 byteStringToHex bs = intercalate "" $ map word8ToHex (B.unpack bs)
 word8ToHex :: Word8 -> String
@@ -73,16 +81,26 @@ data TxOutput = TxOutput Hash Amount
 data Transaction = Transaction
                    TxInput       -- Coinbase is 0000....
                    [TxInput]
-                   [TxOutput]    -- Technically, in the origial bitcoin format,
+                   [TxOutput]    -- Technically, in the original bitcoin format,
                                  -- There should be only two output:
                                  -- The spend and the change
                                  -- But it wouldn't hurt to do a simple extension here
-data Block = Block 
-                   Version
-                   Flag
-                   InCounter
-                   OutCounter
-                   [Transaction]                   
+-- Block definition
+data Block = Hash |
+             FullBlock 
+             Version
+             Flag
+             InCounter
+             OutCounter
+             [Transaction]                   
+-- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
+difficulty :: Integer -> Integer
+difficulty height = floor (logBase 8 (fromIntegral height))
+-- We use a simple algorithm for block PoW difficulty(instead of Bitcoin considering 2 week average):
+-- Per 8^n block, increase difficulty requirement by requesting one more head zero
+-- e.g. at the 1-8 block, require zero difficulty
+-- at 9-64 block, require one zero at the head
+-- Max difficulty is 16 zeros
 
 -- https://wiki.haskell.org/Data_declaration_with_constraint
 -- https://wiki.haskell.org/Generalised_algebraic_datatype
@@ -231,46 +249,55 @@ pubkeyToAddress pubkey =
 
 shell :: AppState ()
 shell = do
+    currentState <- get
     liftIO $ runInputT defaultSettings $ do
         outputStr "CurryCoin> "
         input <- getInputLine ""
         ctx <- liftIO Crypto.Secp256k1.createContext
         case input of
-            Just "exit" -> liftIO $ putStrLn "Exiting..."
+            Just "exit" -> do
+                liftIO $ putStrLn "Exiting..."
+            Just "init" -> do
+                liftIO $ putStrLn "Reset all state to initial"
+                liftIO $ evalStateT shell initialState
             Just "help" -> do
                 liftIO $ putStrLn "exit, help, new_address"
-                liftIO $ evalStateT shell initialState -- Todo: replace initialState upon command exec
+                liftIO $ evalStateT shell currentState
             Just "new_address" -> do
                 private_key <- liftIO $ (Crypto.Hash.SHA256.hash <$> getEntropy 32)
                 let pubKey = derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)
                 liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . appendPubPrefix) pubKey
                 liftIO $ putStrLn $ "New public address: " ++ (pubkeyToAddress pubKey)
                 liftIO $ putStrLn $ "New private key: " ++ (show . byteStringToHex) private_key
-                liftIO $ evalStateT shell initialState                
+                liftIO $ evalStateT shell currentState                
             Just "height" -> do
-                liftIO $ putStrLn "placehold"
-                liftIO $ evalStateT shell initialState
+                case (block currentState)!?0 of
+                    Just n -> do
+                        liftIO $ putStrLn $ show $ length $ block currentState
+                    Nothing -> do
+                        liftIO $ putStrLn "No block exists in the database."
+                liftIO $ evalStateT shell currentState
             Just "transact" -> do
                 liftIO $ putStrLn "placehold"
-                liftIO $ evalStateT shell initialState
+                liftIO $ evalStateT shell currentState
             Just "show_tx_pool" -> do
                 liftIO $ putStrLn "placehold"
-                liftIO $ evalStateT shell initialState
+                liftIO $ evalStateT shell currentState
             Just "show_tx" -> do
                 liftIO $ putStrLn "placehold"
-                liftIO $ evalStateT shell initialState                   
+                liftIO $ evalStateT shell currentState                   
             Just "show_utxo" -> do
                 liftIO $ putStrLn "placehold"
-                liftIO $ evalStateT shell initialState
+                liftIO $ evalStateT shell currentState
             Just "show_utxo_addr" -> do
                 liftIO $ putStrLn "placehold"
-                liftIO $ evalStateT shell initialState   
+                liftIO $ evalStateT shell currentState   
             Just "mint_block" -> do
                 liftIO $ putStrLn "placehold"
-                liftIO $ evalStateT shell initialState
+                liftIO $ evalStateT shell currentState
             Just _      -> do
                 liftIO $ putStrLn "Unknown command"
-                liftIO $ evalStateT shell initialState  -- Continue shell
+                liftIO $ evalStateT shell currentState  -- Continue shell
             Nothing -> return ()  -- If no input is provided
     -- Credit: ChatGPT replaced readline with haskeline
 
