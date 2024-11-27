@@ -7,8 +7,13 @@ module Main where
 import Lib
 import Crypto.Hash.SHA256
 import qualified Data.ByteString as B
-import System.Entropy (getEntropy)
+import Crypto.Hash.RIPEMD160
+import System.Entropy
 import Crypto.Secp256k1
+import Crypto.Secp256k1.Internal.Base
+import Data.ByteString.Base58
+import Data.Map (Map)
+import qualified Data.Map as Map
 -- https://stackoverflow.com/a/40491001
 import qualified Data.ByteString.UTF8 as BSU
 
@@ -30,19 +35,21 @@ type Amount = Integer
 
 data GlobalState = GlobalState {
     -- Todo
-    txPool :: [Transaction]
-    
+    block :: [Block],
+    txPool :: [Transaction],
+    utxo :: [(Hash, Integer)]
 }
 
 -- The Times 03/Jan/2009 Chancellor on brink of second bailout for banks
 initialState = GlobalState {
-    txPool = []
+    txPool = [],
+    utxo = []
 }
 
 type AppState = StateT GlobalState IO
 
 -- Constant section
-flagConst = B.pack [0, 0, 0, 1] -- Constant of 0000 because we don't support SegWit
+flagConst = B.pack [0, 0, 0, 0] -- Constant of 0000 because we don't support SegWit
 
 -- Helper function section
 byteStringToHex :: B.ByteString -> String
@@ -64,13 +71,13 @@ data TxInput = TxInput Hash    -- Previous spendable output
 data TxOutput = TxOutput Hash Amount
 
 data Transaction = Transaction
-                   TxInput       -- Coinbase
+                   TxInput       -- Coinbase is 0000....
                    [TxInput]
                    [TxOutput]    -- Technically, in the origial bitcoin format,
                                  -- There should be only two output:
                                  -- The spend and the change
                                  -- But it wouldn't hurt to do a simple extension here
-data Block = Block
+data Block = Block 
                    Version
                    Flag
                    InCounter
@@ -211,22 +218,64 @@ addToMerkleTree = undefined
 -- Example section
 data MerkleTreeExample = MerkleTreeExample B.ByteString
 
+appendPubPrefix :: PubKey -> BSU.ByteString
+appendPubPrefix (PubKey bs) = B.cons 0x4 bs
+                       
+pubkeyToAddress :: PubKey -> String
+pubkeyToAddress pubkey =
+    show ((encodeBase58 bitcoinAlphabet (addChecksum (B.append (B.pack [0x00]) (Crypto.Hash.RIPEMD160.hash (Crypto.Hash.SHA256.hash (appendPubPrefix pubkey)))))))
+    where
+      addChecksum :: B.ByteString -> B.ByteString
+      addChecksum bs = B.append bs (B.take 4 (Crypto.Hash.SHA256.hash (Crypto.Hash.SHA256.hash bs)))
+ 
+
 shell :: AppState ()
 shell = do
     liftIO $ runInputT defaultSettings $ do
-        outputStr "CurryCoin> (This shell is not yet used!!! Use GHCi for PoC testing)"
+        outputStr "CurryCoin> "
         input <- getInputLine ""
+        ctx <- liftIO Crypto.Secp256k1.createContext
         case input of
             Just "exit" -> liftIO $ putStrLn "Exiting..."
+            Just "help" -> do
+                liftIO $ putStrLn "exit, help, new_address"
+                liftIO $ evalStateT shell initialState -- Todo: replace initialState upon command exec
+            Just "new_address" -> do
+                private_key <- liftIO $ (Crypto.Hash.SHA256.hash <$> getEntropy 32)
+                let pubKey = derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)
+                liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . appendPubPrefix) pubKey
+                liftIO $ putStrLn $ "New public address: " ++ (pubkeyToAddress pubKey)
+                liftIO $ putStrLn $ "New private key: " ++ (show . byteStringToHex) private_key
+                liftIO $ evalStateT shell initialState                
+            Just "height" -> do
+                liftIO $ putStrLn "placehold"
+                liftIO $ evalStateT shell initialState
+            Just "transact" -> do
+                liftIO $ putStrLn "placehold"
+                liftIO $ evalStateT shell initialState
+            Just "show_tx_pool" -> do
+                liftIO $ putStrLn "placehold"
+                liftIO $ evalStateT shell initialState
+            Just "show_tx" -> do
+                liftIO $ putStrLn "placehold"
+                liftIO $ evalStateT shell initialState                   
+            Just "show_utxo" -> do
+                liftIO $ putStrLn "placehold"
+                liftIO $ evalStateT shell initialState
+            Just "show_utxo_addr" -> do
+                liftIO $ putStrLn "placehold"
+                liftIO $ evalStateT shell initialState   
+            Just "mint_block" -> do
+                liftIO $ putStrLn "placehold"
+                liftIO $ evalStateT shell initialState
             Just _      -> do
                 liftIO $ putStrLn "Unknown command"
                 liftIO $ evalStateT shell initialState  -- Continue shell
             Nothing -> return ()  -- If no input is provided
     -- Credit: ChatGPT replaced readline with haskeline
+
 main :: IO ()
 main = evalStateT shell initialState
-
-
 -- Origial test by ChatGPT (modified)
 testMerkleTree :: [String] -> String -> IO ()
 testMerkleTree elements elementToProve = do
