@@ -31,7 +31,7 @@ import Data.Maybe (listToMaybe)
 
 type Hash = B.ByteString
 type Version = B.ByteString
-type Flag = B.ByteString    
+type Flag = B.ByteString
 type InCounter = Integer
 type OutCounter = Integer
 type Amount = Integer
@@ -93,7 +93,7 @@ class Hashable a where
     takeHash = Crypto.Hash.SHA256.hash . serialize
 
 data TxInput = TxInput Hash    -- Previous spendable output
-	       
+
 data TxOutput = TxOutput Hash Amount
 
 data Transaction = Transaction
@@ -106,10 +106,10 @@ data Transaction = Transaction
 data BlockTemplate = BlockTemplate Version Flag InCounter OutCounter [Transaction] B.ByteString -- AdditionalData
 data Block = PrunedBlock Hash B.ByteString Hash | -- BlockHash(MerkleRoot) Nonce PoWHash
 	     FullBlock Hash B.ByteString Hash BlockTemplate
-             
+
 instance Hashable BlockTemplate where
     serialize (BlockTemplate _ _ _ _ _ _) = undefined
-    
+
 instance Show Block where
     show (PrunedBlock root nonce pow) = "Pruned block, Block hash"
     show (FullBlock root nonce pow (BlockTemplate version flag incr oucr [tx] additional)) = "Locally Stored Block"
@@ -212,22 +212,30 @@ createMerkleTreeFromListInternal as = w
 createMerkleTreeFromList :: (Hashable a) => [a] -> MerkleTree a
 createMerkleTreeFromList = createMerkleTreeFromListInternal . map (\x -> LeafNode (takeHash x) x)
 
--- Manuall verify the integrity of a MerkleTree
+-- Manually verify the integrity of a MerkleTree
 verifyMerkleTree :: (Hashable a) =>
 		    MerkleTree a ->
 		    Bool
-verifyMerkleTree = undefined
+
+verifyMerkleTree (LeafNode nodeHash dataVal) =
+        nodeHash == takeHash dataVal -- leaf node hash should be the hash of the data
+
+verifyMerkleTree (INode nodeHash left right) =
+        -- inode hash should be the hash of the concatenation of the left and right children
+        -- and the left and right children should also be valid Merkle trees
+        nodeHash == takeHash (B.append (takeHash left) (takeHash right)) &&
+        verifyMerkleTree left && verifyMerkleTree right
 
 -- Credit: ChatGPT added skewness in generateInclusionProof and proveHashableInclusion for consistent order
 generateInclusionProof :: (Hashable a) =>
-			  MerkleTree a -> 
+			  MerkleTree a ->
 			  a ->		  -- Element to prove inclusion
 			  Maybe [(Bool, Hash)]	-- (IsRightSibling, SiblingHash)
-generateInclusionProof (LeafNode hsh hble) y = 
-    if (takeHash y) == hsh 
+generateInclusionProof (LeafNode hsh hble) y =
+    if (takeHash y) == hsh
     then Just []  -- Element found, return empty proof path
     else Nothing  -- Element not found
-    
+
 generateInclusionProof (INode hsh lft rht) y =
     case generateInclusionProof lft y of
 	Just path -> Just (path ++ [(True, takeHash rht)])  -- Right sibling
@@ -253,23 +261,26 @@ proveHashableInclusion rootHash y proofPath =
 	then takeHash (B.append acc siblingHash)  -- Right sibling: append current hash first
 	else takeHash (B.append siblingHash acc)  -- Left sibling: append sibling hash first
 
-    
+
 addToMerkleTree :: (Hashable a) => (MerkleTree a) -> a -> (MerkleTree a)
-addToMerkleTree = undefined
+addToMerkleTree = originalTree newElement
+    -- take original merkle tree and new element and create a new merkle tree with the new element added
+    let newLeaf = LeafNode (takeHash newElement) newElement
+    in createMerkleTreeFromListInternal [originalTree, newLeaf]
 
 -- Example section
 data MerkleTreeExample = MerkleTreeExample B.ByteString
 
 appendPubPrefix :: PubKey -> BSU.ByteString
 appendPubPrefix (PubKey bs) = B.cons 0x4 bs
-		       
+
 pubkeyToAddress :: PubKey -> String
 pubkeyToAddress pubkey =
     show ((encodeBase58 bitcoinAlphabet (addChecksum (B.append (B.pack [0x00]) (Crypto.Hash.RIPEMD160.hash (Crypto.Hash.SHA256.hash (appendPubPrefix pubkey)))))))
     where
       addChecksum :: B.ByteString -> B.ByteString
       addChecksum bs = B.append bs (B.take 4 (Crypto.Hash.SHA256.hash (Crypto.Hash.SHA256.hash bs)))
- 
+
 
 shell :: AppState ()
 shell = do
@@ -293,7 +304,7 @@ shell = do
 		liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . appendPubPrefix) pubKey
 		liftIO $ putStrLn $ "New public address: " ++ (pubkeyToAddress pubKey)
 		liftIO $ putStrLn $ "New private key: " ++ (show . byteStringToHex) private_key
-		liftIO $ evalStateT shell currentState		      
+		liftIO $ evalStateT shell currentState
 	    Just "height" -> do
 		case (block currentState)!?0 of
 		    Just n -> do
@@ -309,13 +320,13 @@ shell = do
 		liftIO $ evalStateT shell currentState
 	    Just "show_tx" -> do
 		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState			 
+		liftIO $ evalStateT shell currentState
 	    Just "show_utxo" -> do
 		liftIO $ putStrLn "placehold"
 		liftIO $ evalStateT shell currentState
 	    Just "show_utxo_addr" -> do
 		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState	 
+		liftIO $ evalStateT shell currentState
 	    Just "mint_block" -> do
 		liftIO $ putStrLn "placehold"
 		liftIO $ evalStateT shell currentState
