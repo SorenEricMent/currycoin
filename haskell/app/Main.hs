@@ -263,7 +263,7 @@ proveHashableInclusion rootHash y proofPath =
 
 
 addToMerkleTree :: (Hashable a) => (MerkleTree a) -> a -> (MerkleTree a)
-addToMerkleTree = originalTree newElement
+addToMerkleTree originalTree newElement =
     -- take original merkle tree and new element and create a new merkle tree with the new element added
     let newLeaf = LeafNode (takeHash newElement) newElement
     in createMerkleTreeFromListInternal [originalTree, newLeaf]
