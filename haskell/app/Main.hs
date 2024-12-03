@@ -53,7 +53,7 @@ initialState = GlobalState {
 
 generateGenesis :: Block
 generateGenesis =
-        (FullBlock blockHash (B.pack [0x0]) (fst (mining blockHash 0 0)) template)
+        (FullBlock blockHash (B.pack [0x0]) (fst (mining blockHash 0 (difficulty 1))) template)
         where
           template = BlockTemplate (B.pack [0x1]) flagConst 0 0 [] (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
           blockHash = (Crypto.Hash.SHA256.hash (serialize template))
@@ -113,14 +113,21 @@ data Block = PrunedBlock Hash B.ByteString Hash | -- BlockHash(MerkleRoot) Nonce
 	     FullBlock Hash B.ByteString Hash BlockTemplate
 
 instance Hashable BlockTemplate where
-    serialize (BlockTemplate _ _ _ _ _ _) = undefined
+    serialize (BlockTemplate version flag incr oucr txs additional) =
+        B.concat [version, flag, intToByteString (fromIntegral incr), intToByteString (fromIntegral oucr), additional] --placeholder, no txs
 
 instance Show Block where
     show (PrunedBlock root nonce pow) = "Pruned block, Block hash"
-    show (FullBlock root nonce pow (BlockTemplate version flag incr oucr [tx] additional)) = "Locally Stored Block"
+    
+    show (FullBlock root nonce pow (BlockTemplate version flag incr oucr txs additional)) =
+        "Locally Stored Block\n" ++
+        "Block Root Hash: " ++ (byteStringToHex root) ++ "\n" ++
+        "Block POW Hash: " ++ (byteStringToHex pow) ++ "\n" ++
+        "Block Nonce: " ++ (byteStringToHex nonce) ++ "\n"
+        
 -- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
 difficulty :: Integer -> Integer
-difficulty height = floor (logBase 8 (fromIntegral height))
+difficulty height = floor (logBase 8 (fromIntegral height)) + 2
 
 mining :: Hash -> Integer -> Integer -> (Hash, Integer)
 mining target nonce diff = (if (verifyDiff currentHash diff)
@@ -304,50 +311,66 @@ shell = do
 	outputStr "CurryCoin> "
 	input <- getInputLine ""
 	ctx <- liftIO Crypto.Secp256k1.createContext
-	case input of
-	    Just "exit" -> do
-		liftIO $ putStrLn "Exiting..."
-	    Just "init" -> do
-		liftIO $ putStrLn "Reset all state to initial"
-		liftIO $ evalStateT shell initialState
-	    Just "help" -> do
-		liftIO $ putStrLn "exit, help, new_address"
-		liftIO $ evalStateT shell currentState
-	    Just "new_address" -> do
-		private_key <- liftIO $ (Crypto.Hash.SHA256.hash <$> getEntropy 32)
-		let pubKey = derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)
-		liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . appendPubPrefix) pubKey
-		liftIO $ putStrLn $ "New public address: " ++ (pubkeyToAddress pubKey)
-		liftIO $ putStrLn $ "New private key: " ++ (show . byteStringToHex) private_key
-		liftIO $ evalStateT shell currentState
-	    Just "height" -> do
-		case (block currentState)!?0 of
-		    Just n -> do
-			liftIO $ putStrLn $ show $ length $ block currentState
-		    Nothing -> do
-			liftIO $ putStrLn "No block exists in the database."
-		liftIO $ evalStateT shell currentState
-	    Just "transact" -> do
-		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState
-	    Just "show_tx_pool" -> do
-		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState
-	    Just "show_tx" -> do
-		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState
-	    Just "show_utxo" -> do
-		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState
-	    Just "show_utxo_addr" -> do
-		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState
-	    Just "mint_block" -> do
-		liftIO $ putStrLn "placehold"
-		liftIO $ evalStateT shell currentState
-	    Just _	-> do
-		liftIO $ putStrLn "Unknown command"
-		liftIO $ evalStateT shell currentState	-- Continue shell
+        case input of
+            Just input_data ->
+                case (words (input_data))!?0 of
+                    Just "exit" -> do
+                        liftIO $ putStrLn "Exiting..."
+                    Just "init" -> do
+                        liftIO $ putStrLn "Reset all state to initial"
+                        liftIO $ evalStateT shell initialState
+                    Just "help" -> do
+                        liftIO $ putStrLn "exit, help, init, new_address, height, transact"
+                        liftIO $ evalStateT shell currentState
+                    Just "new_address" -> do
+                        private_key <- liftIO $ (Crypto.Hash.SHA256.hash <$> getEntropy 32)
+                        let pubKey = derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)
+                        liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . appendPubPrefix) pubKey
+                        liftIO $ putStrLn $ "New public address: " ++ (pubkeyToAddress pubKey)
+                        liftIO $ putStrLn $ "New private key: " ++ (show . byteStringToHex) private_key
+                        liftIO $ evalStateT shell currentState
+                    Just "height" -> do
+                        case (block currentState)!?0 of
+                            Just n -> do
+                                liftIO $ putStrLn $ show $ length $ block currentState
+                            Nothing -> do
+                                liftIO $ putStrLn "No block exists in the database."
+                        liftIO $ evalStateT shell currentState
+                    Just "transact" -> do
+                        liftIO $ putStrLn "placehold"
+                        liftIO $ evalStateT shell currentState
+                    Just "show_tx_pool" -> do
+                        liftIO $ putStrLn "placehold"
+                        liftIO $ evalStateT shell currentState
+                    Just "show_tx" -> do
+                        liftIO $ putStrLn "placehold"
+                        liftIO $ evalStateT shell currentState
+                    Just "show_utxo" -> do
+                        liftIO $ putStrLn "placehold"
+                        liftIO $ evalStateT shell currentState
+                    Just "show_utxo_addr" -> do
+                        liftIO $ putStrLn "placehold"
+                        liftIO $ evalStateT shell currentState
+                    Just "show_block" -> do
+                        case (words (input_data))!?1 of
+                            Just height ->
+                                case (block currentState)!?((read height)-1) of
+                                    Just blk -> do
+                                        liftIO $ putStrLn (show blk)
+                                        liftIO $ evalStateT shell currentState
+                                    Nothing -> do
+                                        liftIO $ putStrLn "No block with such height exists!"
+                                        liftIO $ evalStateT shell currentState
+                            Nothing -> do
+                                liftIO $ putStrLn "Missing block height!"
+                                liftIO $ evalStateT shell currentState
+                    Just "mint_block" -> do
+                        liftIO $ putStrLn "placehold"
+                        liftIO $ evalStateT shell currentState
+                    Just _	-> do
+                        liftIO $ putStrLn "Unknown command"
+                        liftIO $ evalStateT shell currentState	-- Continue shell
+                    Nothing -> return ()  -- If no input is provided
 	    Nothing -> return ()  -- If no input is provided
     -- Credit: ChatGPT replaced readline with haskeline
 
