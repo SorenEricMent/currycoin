@@ -293,12 +293,15 @@ addToMerkleTree originalTree newElement =
 -- Example section
 data MerkleTreeExample = MerkleTreeExample B.ByteString
 
-appendPubPrefix :: PubKey -> BSU.ByteString
-appendPubPrefix (PubKey bs) = B.cons 0x4 bs
+processPubKeyFromLib :: PubKey -> BSU.ByteString
+processPubKeyFromLib (PubKey bs) =
+    B.pack ([0x4] ++ (snd sres) ++ (fst sres))
+    where
+      sres = (splitAt 32 . reverse . B.unpack) bs
 
 pubkeyToAddress :: PubKey -> String
 pubkeyToAddress pubkey =
-    show ((encodeBase58 bitcoinAlphabet (addChecksum (B.append (B.pack [0x00]) (Crypto.Hash.RIPEMD160.hash (Crypto.Hash.SHA256.hash (appendPubPrefix pubkey)))))))
+    show ((encodeBase58 bitcoinAlphabet (addChecksum (B.append (B.pack [0x00]) (Crypto.Hash.RIPEMD160.hash (Crypto.Hash.SHA256.hash (processPubKeyFromLib pubkey)))))))
     where
       addChecksum :: B.ByteString -> B.ByteString
       addChecksum bs = B.append bs (B.take 4 (Crypto.Hash.SHA256.hash (Crypto.Hash.SHA256.hash bs)))
@@ -325,7 +328,7 @@ shell = do
                     Just "new_address" -> do
                         private_key <- liftIO $ (Crypto.Hash.SHA256.hash <$> getEntropy 32)
                         let pubKey = derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)
-                        liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . appendPubPrefix) pubKey
+                        liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . processPubKeyFromLib) pubKey
                         liftIO $ putStrLn $ "New public address: " ++ (pubkeyToAddress pubKey)
                         liftIO $ putStrLn $ "New private key: " ++ (show . byteStringToHex) private_key
                         liftIO $ evalStateT shell currentState
