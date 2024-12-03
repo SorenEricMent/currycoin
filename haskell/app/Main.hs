@@ -21,7 +21,8 @@ import qualified Data.ByteString.UTF8 as BSU
 
 import Data.Word (Word8)
 import Numeric (showHex)
-import Data.List (intercalate)
+import Data.List (intercalate, isPrefixOf)
+import Data.Binary (encode)
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
@@ -52,7 +53,7 @@ initialState = GlobalState {
 
 generateGenesis :: Block
 generateGenesis =
-        (FullBlock blockHash (B.pack [0x0]) (mining blockHash 0 0) template)
+        (FullBlock blockHash (B.pack [0x0]) (fst (mining blockHash 0 0)) template)
         where
           template = BlockTemplate (B.pack [0x1]) flagConst 0 0 [] (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
           blockHash = (Crypto.Hash.SHA256.hash (serialize template))
@@ -73,6 +74,10 @@ hexToByteString :: String -> B.ByteString
 hexToByteString hexStr
   | odd (length hexStr) = error "Invalid hex string: odd length"
   | otherwise = B.pack $ map (fst . head . readHex) (chunksOf 2 hexStr)
+
+-- Convert Int to ByteString.UTF8
+intToByteString :: Int -> BSU.ByteString
+intToByteString n = BSU.fromString (show n)
 
 -- Helper function to split a string into chunks of the given size
 chunksOf :: Int -> [a] -> [[a]]
@@ -117,8 +122,18 @@ instance Show Block where
 difficulty :: Integer -> Integer
 difficulty height = floor (logBase 8 (fromIntegral height))
 
-mining :: Hash -> Integer -> Integer-> Hash
-mining target nonce difficulty = undefined
+mining :: Hash -> Integer -> Integer -> (Hash, Integer)
+mining target nonce diff = (if (verifyDiff currentHash diff)
+                                     then (currentHash, nonce)
+                                     else (mining target (nonce + 1) diff))
+  where currentHash = (Crypto.Hash.SHA256.hash (B.concat [target, intToByteString (fromIntegral nonce)]))
+
+verifyPOW :: Hash -> Hash -> Integer -> Bool -- Does not check difficulty
+verifyPOW target result nonce = result == (Crypto.Hash.SHA256.hash (B.concat [target, intToByteString (fromIntegral nonce)]))
+-- e.g. verifyPOW (hexToByteString "1a2b3d") (hexToByteString "0538c0b1223aad095feefecb31ebb517fd2f730e97a3cfbf01c3d235a3edb387") 9 -> True
+
+verifyDiff :: Hash -> Integer -> Bool
+verifyDiff target diff = (Data.List.isPrefixOf (replicate (fromIntegral diff) '0') (byteStringToHex target))
 
 -- We use a simple algorithm for block PoW difficulty(instead of Bitcoin considering 2 week average):
 -- Per 8^n block, increase difficulty requirement by requesting one more head zero

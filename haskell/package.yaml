@@ -16,6 +16,7 @@ dependencies:
 - containers
 - ppad-ripemd160
 - base58-bytestring
+- binary
 
 library:
   source-dirs: src
