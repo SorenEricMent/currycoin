@@ -28,7 +28,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
 import System.IO (hFlush, stdout)
 import System.Console.Haskeline
-import Data.Maybe (listToMaybe)
+import Data.Maybe (listToMaybe, fromJust)
 
 type Hash = B.ByteString
 type Version = B.ByteString
@@ -41,23 +41,38 @@ data GlobalState = GlobalState {
     -- Todo
     block :: [Block],
     txPool :: [Transaction],
-    utxo :: [(Hash, Integer)]
+    utxo :: [(TxOutput, Hash)]
 }
 
 -- The Times 03/Jan/2009 Chancellor on brink of second bailout for banks
 initialState = GlobalState {
-    block = [(generateGenesis)],
+    block = [genesis],
     txPool = [],
-    utxo = []
-}
+    utxo = [(getOutput $ fromJust $ getCoinbase genesis)!!0] -- We assume coinbase pay and only pay to one, no p2p mining share, so we uses unsafe fromJust
+} where
+  genesis = generateGenesis
 
 generateGenesis :: Block
 generateGenesis =
-        (FullBlock blockHash (B.pack [0x0]) (fst (mining blockHash 0 (difficulty 1))) template)
+        (FullBlock blockHash (intToByteString $ fromIntegral $ snd genesisBlockTuple) (fst genesisBlockTuple) template)
         where
-          template = BlockTemplate (B.pack [0x1]) flagConst 0 0 [] (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
+          template = BlockTemplate (B.pack [0x1]) (B.pack [0x0]) flagConst 0 0 [genesisTX] (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
+          genesisBlockTuple = (mining blockHash 0 (difficulty 1))
           blockHash = (Crypto.Hash.SHA256.hash (serialize template))
+          genesisOutput = (TxOutput "1Curry58bkekKypHUv6wm82XDqnNzgsZNy" 100)
+          genesisCoinbase = (B.pack [0x0])
+          genesisTX = Transaction [genesisCoinbase] [(genesisOutput, getTXID genesisOutput genesisCoinbase)] [] -- No sig for coinbase
+showTxPool :: [Transaction] -> String
+showTxPool = undefined
 
+showUTXO :: [(TxOutput, Hash)] -> String
+showUTXO utxo = intercalate "\n" (map singleOutputShow utxo)
+  where  -- Somehow using show causes an overlap in type
+    singleOutputShow :: (TxOutput, Hash) -> String
+    singleOutputShow ((TxOutput addr amount), hash) = "Output Hash: " ++ byteStringToHex hash ++ "\n" ++ 
+                                                      "Address: " ++ addr ++ "\n" ++
+                                                      "Amount: " ++ show amount ++ "\n"
+    
 type AppState = StateT GlobalState IO
 -- Constant section
 flagConst = B.pack [0, 0, 0, 0] -- Constant of 0000 because we don't support SegWit
@@ -97,33 +112,50 @@ class Hashable a where
     takeHash :: a -> Hash
     takeHash = Crypto.Hash.SHA256.hash . serialize
 
-data TxInput = TxInput Hash    -- Previous spendable output
+type TxInput = Hash    -- Previous spendable output
 
-data TxOutput = TxOutput Hash Amount
+data TxOutput = TxOutput String Amount  -- Address and amount
 
 data Transaction = Transaction
 		   [TxInput]
-		   [TxOutput]	 -- Technically, in the original bitcoin format,
-				 -- There should be only two output:
+		   [(TxOutput, Hash)]	 -- Technically, in the original bitcoin format,
+		   [B.ByteString]  -- There should be only two output:
 				 -- The spend and the change
 				 -- But it wouldn't hurt to do a simple extension here
+                   -- Last array is signatures, every input address need to have sigs
+                   -- Hash should not take the signatures as signature is on the tx hash
+getOutput :: Transaction -> [(TxOutput, Hash)]
+getOutput (Transaction _ r _) = r
+
+getTXID :: TxOutput -> Hash -> Hash
+getTXID (TxOutput addr amount) inHash = Crypto.Hash.SHA256.hash (B.concat [inHash, BSU.fromString addr, intToByteString $ fromIntegral amount])
+
+instance Hashable Transaction where
+    serialize (Transaction inputs outputTuples _) = B.concat (inputs ++ (map snd outputTuples))  -- Signature shoule be added after the hash is computed
+
+    
 -- Block definition
-data BlockTemplate = BlockTemplate Version Flag InCounter OutCounter [Transaction] B.ByteString -- AdditionalData
+data BlockTemplate = BlockTemplate Version Hash Flag InCounter OutCounter [Transaction] B.ByteString -- AdditionalData, Hash is previous hash
 data Block = PrunedBlock Hash B.ByteString Hash | -- BlockHash(MerkleRoot) Nonce PoWHash
 	     FullBlock Hash B.ByteString Hash BlockTemplate
 
+getCoinbase :: Block -> Maybe Transaction
+getCoinbase (PrunedBlock _ _ _) = Nothing
+getCoinbase (FullBlock _ _ _ (BlockTemplate _ _ _ _ _ txs _)) = txs!?0
+    
 instance Hashable BlockTemplate where
-    serialize (BlockTemplate version flag incr oucr txs additional) =
-        B.concat [version, flag, intToByteString (fromIntegral incr), intToByteString (fromIntegral oucr), additional] --placeholder, no txs
+    serialize (BlockTemplate version prevHash flag incr oucr txs additional) =
+        B.concat [version, prevHash, flag, intToByteString (fromIntegral incr), intToByteString (fromIntegral oucr), additional] --placeholder, no txs
 
 instance Show Block where
     show (PrunedBlock root nonce pow) = "Pruned block, Block hash"
     
-    show (FullBlock root nonce pow (BlockTemplate version flag incr oucr txs additional)) =
+    show (FullBlock root nonce pow (BlockTemplate version prevHash flag incr oucr txs additional)) =
         "Locally Stored Block\n" ++
         "Block Root Hash: " ++ (byteStringToHex root) ++ "\n" ++
         "Block POW Hash: " ++ (byteStringToHex pow) ++ "\n" ++
-        "Block Nonce: " ++ (byteStringToHex nonce) ++ "\n"
+        "Block Nonce: " ++ (show nonce) ++ "\n" ++
+        "Included previous hash: " ++ (byteStringToHex prevHash) ++ "\n"
         
 -- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
 difficulty :: Integer -> Integer
@@ -342,6 +374,9 @@ shell = do
                     Just "transact" -> do
                         liftIO $ putStrLn "placehold"
                         liftIO $ evalStateT shell currentState
+                    Just "new_tx" -> do
+                        liftIO $ putStrLn "placehold"
+                        liftIO $ evalStateT shell currentState
                     Just "show_tx_pool" -> do
                         liftIO $ putStrLn "placehold"
                         liftIO $ evalStateT shell currentState
@@ -349,7 +384,7 @@ shell = do
                         liftIO $ putStrLn "placehold"
                         liftIO $ evalStateT shell currentState
                     Just "show_utxo" -> do
-                        liftIO $ putStrLn "placehold"
+                        liftIO $ putStrLn $ showUTXO $ utxo currentState
                         liftIO $ evalStateT shell currentState
                     Just "show_utxo_addr" -> do
                         liftIO $ putStrLn "placehold"
