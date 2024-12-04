@@ -37,9 +37,10 @@ showUTXO :: [(TxOutput, Hash)] -> String
 showUTXO utxo = intercalate "\n" (map singleOutputShow utxo)
   where  -- Somehow using show causes an overlap in type
     singleOutputShow :: (TxOutput, Hash) -> String
-    singleOutputShow ((TxOutput addr amount), hash) = "Output Hash: " ++ byteStringToHex hash ++ "\n" ++ 
-                                                      "Address: " ++ addr ++ "\n" ++
-                                                      "Amount: " ++ show amount ++ "\n"
+    singleOutputShow ((TxOutput addr amount), hash) =
+        "Output Hash:\t" ++ byteStringToHex hash ++ "\n" ++
+        "Address:\t" ++ addr ++ "\n" ++
+        "Amount:\t\t" ++ show amount ++ "\n"
     
 type AppState = StateT GlobalState IO
 
@@ -64,9 +65,9 @@ shell = do
                     Just "new_address" -> do
                         private_key <- liftIO $ genPrivateKey
                         let pubKey = derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)
-                        liftIO $ putStrLn $ "New public key: " ++ (byteStringToHex . processPubKeyFromLib) pubKey
-                        liftIO $ putStrLn $ "New public address: " ++ (pubkeyToAddress pubKey)
-                        liftIO $ putStrLn $ "New private key: " ++ (show . byteStringToHex) private_key
+                        liftIO $ putStrLn $ "New private key:\t" ++ (show . byteStringToHex) private_key
+                        liftIO $ putStrLn $ "New public key:\t\t" ++ (show . byteStringToHex . processPubKeyFromLib) pubKey
+                        liftIO $ putStrLn $ "New public address:\t" ++ (pubkeyToAddress pubKey)
                         liftIO $ evalStateT shell currentState
                     Just "height" -> do
                         case (block currentState)!?0 of
