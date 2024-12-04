@@ -2,6 +2,7 @@ module Currycoin.Data.Block where
 
 import Crypto.Hash.SHA256
 import Currycoin.Common
+import Currycoin.Data.MerkleTree
 import Currycoin.Data.Transaction
 import Data.List (isPrefixOf)
 import qualified Data.ByteString as B
@@ -12,25 +13,47 @@ type Flag = B.ByteString
 type InCounter = Integer
 type OutCounter = Integer
 
+hashEmptyTree :: Hash
+hashEmptyTree = B.pack (replicate 32 0)
+
 -- Constant section
 flagConst = B.pack [0, 0, 0, 0] -- Constant of 0000 because we don't support SegWit
 -- Block definition
-data BlockTemplate = BlockTemplate Version Hash Flag InCounter OutCounter [Transaction] B.ByteString -- AdditionalData, Hash is previous hash
-data Block = PrunedBlock Hash B.ByteString Hash | -- BlockHash(MerkleRoot) Nonce PoWHash
+data BlockTemplate = BlockTemplate Version
+                                   Hash
+                                   Flag
+                                   InCounter
+                                   OutCounter
+                                   Transaction -- coinBase
+                                   (Maybe (MerkleTree Transaction))
+                                   -- AdditionalData, Hash is previous hash
+                                   B.ByteString
+
+             -- BlockHash(MerkleRoot) Nonce PoWHash
+data Block = PrunedBlock Hash B.ByteString Hash |
              FullBlock Hash B.ByteString Hash BlockTemplate
 
 getCoinbase :: Block -> Maybe Transaction
 getCoinbase (PrunedBlock _ _ _) = Nothing
-getCoinbase (FullBlock _ _ _ (BlockTemplate _ _ _ _ _ txs _)) = txs!?0
+getCoinbase (FullBlock _ _ _ (BlockTemplate _ _ _ _ _ coinbase _ _)) = Just coinbase
 
 instance Hashable BlockTemplate where
-    serialize (BlockTemplate version prevHash flag incr oucr txs additional) =
-        B.concat [version, prevHash, flag, intToByteString (fromIntegral incr), intToByteString (fromIntegral oucr), additional] --placeholder, no txs
+    serialize (BlockTemplate version prevHash flag incr oucr coinbase txs additional) =
+        B.concat [version,
+                  prevHash,
+                  flag,
+                  intToByteString (fromIntegral incr),
+                  intToByteString (fromIntegral oucr),
+                  (serialize coinbase),
+                  case txs of
+                    Just a -> serialize a
+                    Nothing -> hashEmptyTree,
+                 additional]
 
 instance Show Block where
     show (PrunedBlock root nonce pow) = "Pruned block, Block hash"
     
-    show (FullBlock root nonce pow (BlockTemplate version prevHash flag incr oucr txs additional)) =
+    show (FullBlock root nonce pow (BlockTemplate version prevHash flag incr oucr coinbase txs additional)) =
         "Locally Stored Block\n" ++
         "Block Root Hash: " ++ (byteStringToHex root) ++ "\n" ++
         "Block POW Hash: " ++ (byteStringToHex pow) ++ "\n" ++
@@ -64,7 +87,7 @@ generateGenesis :: Block
 generateGenesis =
         (FullBlock blockHash (intToByteString $ fromIntegral $ snd genesisBlockTuple) (fst genesisBlockTuple) template)
         where
-          template = BlockTemplate (B.pack [0x1]) (B.pack [0x0]) flagConst 0 0 [genesisTX] (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
+          template = BlockTemplate (B.pack [0x1]) (B.pack [0x0]) flagConst 0 0 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
           genesisBlockTuple = (mining blockHash 0 (difficulty 1))
           blockHash = (Crypto.Hash.SHA256.hash (serialize template))
           genesisOutput = (TxOutput "1Curry58bkekKypHUv6wm82XDqnNzgsZNy" 100)
