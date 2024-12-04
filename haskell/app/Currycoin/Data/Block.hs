@@ -54,12 +54,12 @@ getCoinbase (PrunedBlock _ _ _ _ _) = Nothing
 getCoinbase (FullBlock _ _ _ _ _ (BlockTemplate _ _ _ _ coinbase _ _)) = Just coinbase
 
 instance Show Block where
-    show (PrunedBlock templateHash rootHash previousHash nonce powHash) = "Pruned block, Block hash"
-    show (FullBlock   templateHash rootHash previousHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional)) =
+    show (PrunedBlock templateHash rootHash prevHash nonce powHash) = "Pruned block, Block hash"
+    show (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional)) =
         "Locally Stored Block\n" ++
         "Block Template Hash:\t" ++ (byteStringToHex templateHash) ++ "\n" ++
         "Block Root Hash:\t" ++ (byteStringToHex rootHash) ++ "\n" ++
-        "Included previous hash:\t" ++ (byteStringToHex previousHash) ++ "\n" ++
+        "Included previous hash:\t" ++ (byteStringToHex prevHash) ++ "\n" ++
         "Block POW Hash:\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
         "Block Nonce:\t\t" ++ (show nonce) ++ "\n"
         
@@ -68,10 +68,12 @@ difficulty :: Integer -> Integer
 difficulty height = floor (logBase 8 (fromIntegral height)) + 2
 
 mining :: Hash -> Integer -> Integer -> (Hash, Integer)
-mining target nonce diff = (if (verifyDiff currentHash diff)
-                                     then (currentHash, nonce)
-                                     else (mining target (nonce + 1) diff))
-  where currentHash = (Crypto.Hash.SHA256.hash (B.concat [target, intToByteString (fromIntegral nonce)]))
+mining target nonce diff =
+  (if (verifyDiff currentHash diff)
+    then (currentHash, nonce)
+    else (mining target (nonce + 1) diff))
+  where
+    currentHash = hash (B.concat [target, intToByteString (fromIntegral nonce)])
 
 verifyPOW :: Hash -> Hash -> Integer -> Bool -- Does not check difficulty
 verifyPOW target result nonce = result == (Crypto.Hash.SHA256.hash (B.concat [target, intToByteString (fromIntegral nonce)]))
@@ -88,16 +90,21 @@ verifyDiff target diff = (Data.List.isPrefixOf (replicate (fromIntegral diff) '0
 
 generateGenesis :: Block
 generateGenesis =
-        (FullBlock (takeHash template) -- template hash
-                   hashEmptyTree -- merkle tree hash
-                   hashEmptyTree -- previous hash
-                   (intToByteString $ fromIntegral $ snd genesisBlockTuple) -- nonce
-                   (fst genesisBlockTuple) -- pow hash
-                   template) -- template
+        (FullBlock templateHash
+                   rootHash
+                   prevHash
+                   nonce
+                   powHash
+                   template)
         where
-          template = BlockTemplate (B.pack [0x1]) flagConst 0 0 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
-          genesisBlockTuple = (mining blockHash 0 (difficulty 1))
-          blockHash = takeHash template
           genesisOutput = (TxOutput "1Curry58bkekKypHUv6wm82XDqnNzgsZNy" 100)
-          genesisCoinbase = (B.pack [0x0])
           genesisTX = Transaction [genesisCoinbase] [(genesisOutput, getTXID genesisOutput genesisCoinbase)] [] -- No sig for coinbase
+          genesisCoinbase = (B.pack [0x0])
+          template = BlockTemplate (B.pack [0x1]) flagConst 0 0 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
+          templateHash = takeHash template
+          rootHash = hashEmptyTree
+          prevHash = hashEmptyTree
+          miningHash = (hash . B.concat) [templateHash, rootHash, prevHash]
+          genesisBlockTuple = (mining miningHash 0 (difficulty 1))
+          nonce = (intToByteString . fromIntegral . snd) genesisBlockTuple
+          powHash = (fst genesisBlockTuple)
