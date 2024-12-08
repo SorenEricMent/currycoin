@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 module Main where
 
 import Lib
@@ -9,6 +10,8 @@ import Crypto.Secp256k1
 import Data.ByteString.Base58
 import Data.Maybe (listToMaybe, fromJust)
 import Data.List (intercalate, intersperse)
+import qualified Data.ByteString as B
+import Currycoin.Data.MerkleTree
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
@@ -105,8 +108,24 @@ shell = do
                                 liftIO $ putStrLn "Missing block height!"
                                 liftIO $ evalStateT shell currentState
                     Just "mint_block" -> do
-                        liftIO $ putStrLn "placehold"
-                        liftIO $ evalStateT shell currentState
+                        case (words (input_data))!?1 of
+                            Just addr -> do
+                                let height = (length $ block currentState)
+                                let txs = txPool currentState
+                                let txsMaybe = if (txs == []) then Nothing else Just (createMerkleTreeFromList txs)
+                                let prevHash = B.pack [0x0] -- todo
+                                let additional = B.pack [0x0] -- todo
+                                liftIO $ putStrLn "Started mining!"
+                                let !newBlock = mintBlock (B.pack [0x1]) flagConst addr txsMaybe (fromIntegral height) prevHash additional
+                                let newState = GlobalState {
+                                    block = (block currentState) ++ [newBlock],
+                                    txPool = [],
+                                    utxo = [] -- todo
+                                                        }
+                                liftIO $ evalStateT shell newState
+                            Nothing -> do
+                                liftIO $ putStrLn "Missing miner address!"
+                                liftIO $ evalStateT shell currentState
                     Just _        -> do
                         liftIO $ putStrLn "Unknown command"
                         liftIO $ evalStateT shell currentState        -- Continue shell

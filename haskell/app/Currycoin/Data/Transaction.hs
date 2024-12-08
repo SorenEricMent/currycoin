@@ -13,6 +13,7 @@ data Transaction = Transaction
                    [TxInput]
                    [(TxOutput, Hash)] -- Technically, in the original bitcoin format,
                    [B.ByteString]     -- There should be only two output:
+    deriving (Eq)                   
                                       -- The spend and the change
                                       -- But it wouldn't hurt to do a simple extension here
                    -- Last array is signatures, every input address need to have sigs

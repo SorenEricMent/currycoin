@@ -5,6 +5,7 @@ import Currycoin.Common
 import Currycoin.Data.MerkleTree
 import Currycoin.Data.Transaction
 import Data.List (isPrefixOf)
+import Data.Maybe (fromJust, isNothing)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BSU
 
@@ -79,7 +80,7 @@ instance Show Block where
         
 -- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
 difficulty :: Integer -> Integer
-difficulty height = floor (logBase 8 (fromIntegral height)) + 2
+difficulty height = min 10 (floor (logBase 4 (fromIntegral height)) + 2)
 
 mining :: Hash -> Integer -> Integer -> (Hash, Integer)
 mining target nonce diff =
@@ -89,9 +90,21 @@ mining target nonce diff =
   where
     currentHash = hash (B.concat [target, intToByteString (fromIntegral nonce)])
 
-mintBlock :: Version -> Flag -> String -> (Maybe (MerkleTree Transaction)) -> Integer -> Hash -> BSU.ByteString -> Block -- Address, tx to be included, diff, previous hash
-mintBlock v f addr txs diff prevhash additional = undefined
-
+mintBlock :: Version -> Flag -> String -> (Maybe (MerkleTree Transaction)) -> Integer -> Hash -> BSU.ByteString -> Block -- Version, Flag, Address, tx to be included, height(for diff and coinbase), previous hash additional data
+mintBlock v f addr txs height prevHash additional =
+    (FullBlock templateHash rootHash prevHash nonce powHash template)
+    where
+      amountTuple = (if (isNothing txs) then (0, 0) else (countTxMerkleTree (fromJust txs)))
+      coinbaseOutput = TxOutput addr 100
+      coinbase = Transaction [] [(coinbaseOutput, getTXID coinbaseOutput (intToByteString $ fromInteger height))] []
+      template = (BlockTemplate v f (fromIntegral (fst amountTuple)) (fromIntegral (snd amountTuple)) coinbase txs additional)
+      templateHash = takeHash template
+      rootHash = (if (isNothing txs) then hashEmptyTree else (takeHash (fromJust txs)))
+      miningHash = (hash . B.concat) [templateHash, rootHash, prevHash]
+      powResult = mining miningHash 0 (difficulty $ fromIntegral height)
+      powHash = (fst powResult)
+      nonce = (intToByteString . fromIntegral . snd) powResult
+      
 verifyPOW :: Hash -> Hash -> Integer -> Bool -- Does not check difficulty
 verifyPOW target result nonce = result == (Crypto.Hash.SHA256.hash (B.concat [target, intToByteString (fromIntegral nonce)]))
 -- e.g. verifyPOW (hexToByteString "1a2b3d") (hexToByteString "0538c0b1223aad095feefecb31ebb517fd2f730e97a3cfbf01c3d235a3edb387") 9 -> True
@@ -116,7 +129,7 @@ generateGenesis =
         where
           genesisOutput = (TxOutput "1Curry58bkekKypHUv6wm82XDqnNzgsZNy" 100)
           genesisTX = Transaction [] [(genesisOutput, getTXID genesisOutput (B.pack [0x0]))] [] -- No sig for coinbase
-          template = BlockTemplate (B.pack [0x1]) flagConst 1 1 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks") 
+          template = BlockTemplate (B.pack [0x1]) flagConst 0 1 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks") 
           templateHash = takeHash template
           rootHash = hashEmptyTree
           prevHash = hashEmptyTree

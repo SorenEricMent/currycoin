@@ -13,10 +13,10 @@ import qualified Data.ByteString.UTF8 as BSU
 import Data.Bits (testBit)
 
 type Hash = B.ByteString
-type Amount = Integer
+type Amount = Int
 type TxInput = Hash -- Previous spendable output
 data TxOutput = TxOutput String Amount -- Address and amount
-
+    deriving (Eq)
 class Hashable a where
     serialize :: a -> B.ByteString
     takeHash :: a -> Hash
