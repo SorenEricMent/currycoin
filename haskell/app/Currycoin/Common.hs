@@ -28,6 +28,9 @@ instance Hashable String where
 instance Hashable B.ByteString where
     serialize a = a
 
+instance Show TxOutput where
+    show (TxOutput addr amount) = "To: " ++ addr ++ "\nAmount: " ++ (show amount) ++ "\n"
+
 -- Helper function section
 (!?) :: [a] -> Int -> Maybe a
 xs !? n

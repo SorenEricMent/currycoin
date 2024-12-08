@@ -8,7 +8,7 @@ import Currycoin.Data.Block
 import Crypto.Secp256k1
 import Data.ByteString.Base58
 import Data.Maybe (listToMaybe, fromJust)
-import Data.List (intercalate)
+import Data.List (intercalate, intersperse)
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
@@ -31,7 +31,7 @@ initialState = GlobalState {
   genesis = generateGenesis
 
 showTxPool :: [Transaction] -> String
-showTxPool = undefined
+showTxPool txs = "Pending Transaction Pool: \n" ++ concat (intersperse "\n" (map show txs))
 
 showUTXO :: [(TxOutput, Hash)] -> String
 showUTXO utxo = intercalate "\n" (map singleOutputShow utxo)
@@ -75,9 +75,6 @@ shell = do
                                 liftIO $ putStrLn $ show $ length $ block currentState
                             Nothing -> do
                                 liftIO $ putStrLn "No block exists in the database."
-                        liftIO $ evalStateT shell currentState
-                    Just "transact" -> do
-                        liftIO $ putStrLn "placehold"
                         liftIO $ evalStateT shell currentState
                     Just "new_tx" -> do
                         liftIO $ putStrLn "placehold"

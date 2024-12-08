@@ -2,7 +2,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DataKinds #-}
+
 module Currycoin.Data.MerkleTree where
 
 import Currycoin.Common
@@ -94,6 +94,11 @@ createMerkleTreeFromListInternal as = w
 
 createMerkleTreeFromList :: (Hashable a) => [a] -> MerkleTree a
 createMerkleTreeFromList = createMerkleTreeFromListInternal . map (\x -> LeafNode (takeHash x) x)
+
+convertMerkleTreeToList :: MerkleTree a -> [a]
+-- dangerous! We often need the structure of MerkleTree! It is impossible to convert the list back to the same tree sound
+convertMerkleTreeToList (LeafNode _ val) = [val]
+convertMerkleTreeToList (INode _ l r) = convertMerkleTreeToList l ++ convertMerkleTreeToList r
 
 -- Manually verify the integrity of a MerkleTree
 verifyMerkleTree :: (Hashable a) => MerkleTree a -> Bool

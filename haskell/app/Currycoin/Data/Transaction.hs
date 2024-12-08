@@ -7,6 +7,7 @@ import Crypto.Hash.SHA256
 import Currycoin.Common
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BSU
+import Data.List (intersperse)
 
 data Transaction = Transaction
                    [TxInput]
@@ -29,6 +30,19 @@ instance Hashable (Maybe (MerkleTree Transaction)) where
     serialize (Just x) = serialize x
     serialize Nothing = B.pack [0x0]
 
+instance Show Transaction where
+    show (Transaction ins outs []) =
+        "Inputs: \n" ++ (inputsToString ins) ++ "\n" ++
+        "Outputs: \n" ++ concat (map showOutputTuple outs)
+        where inputsToString [] = "No inputs."
+              inputsToString ins = concat (intersperse "\n" (map byteStringToHex ins))
+    show (Transaction ins outs sigs) = (show (Transaction ins outs [])) ++ "\nSignatures: " ++
+        concat (intersperse "\n" (map show sigs))
+
+showOutputTuple :: (TxOutput, Hash) -> String
+showOutputTuple (x, h) = show x ++ "Hash: " ++ byteStringToHex h
+instance Show (MerkleTree Transaction) where
+    show t = concat (map show (convertMerkleTreeToList t))
 countInput :: Transaction -> Int
 countInput (Transaction inputs _ _) = length inputs
 countOutput :: Transaction -> Int
