@@ -35,7 +35,7 @@ instance Hashable BlockTemplate where
                   intToByteString (fromIntegral incr),
                   intToByteString (fromIntegral oucr),
                   (serialize coinbase),
-                  -- No MerkleTree hash
+                  (serialize txs),
                   additional]
 
 -- Block: BlockTemplate hash without MerkleTree
@@ -54,14 +54,28 @@ getCoinbase (PrunedBlock _ _ _ _ _) = Nothing
 getCoinbase (FullBlock _ _ _ _ _ (BlockTemplate _ _ _ _ coinbase _ _)) = Just coinbase
 
 instance Show Block where
-    show (PrunedBlock templateHash rootHash prevHash nonce powHash) = "Pruned block, Block hash"
+    show (PrunedBlock templateHash rootHash prevHash nonce powHash) =
+        "Pruned block, Block hash\n" ++
+        "Block Template Hash:\t" ++ (byteStringToHex templateHash) ++ "\n" ++
+        "Block Root Hash:\t" ++ (byteStringToHex rootHash) ++ "\n" ++
+        "Included previous hash:\t" ++ (byteStringToHex prevHash) ++ "\n" ++
+        "Block POW Hash:\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
+        "Block Nonce:\t\t" ++ (show nonce) ++ "\n"
     show (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional)) =
         "Locally Stored Block\n" ++
         "Block Template Hash:\t" ++ (byteStringToHex templateHash) ++ "\n" ++
         "Block Root Hash:\t" ++ (byteStringToHex rootHash) ++ "\n" ++
         "Included previous hash:\t" ++ (byteStringToHex prevHash) ++ "\n" ++
         "Block POW Hash:\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
-        "Block Nonce:\t\t" ++ (show nonce) ++ "\n"
+        "Block Nonce:\t\t" ++ (show nonce) ++ "\n\n" ++
+        "Block Version:\t" ++ (byteStringToHex version) ++ "\n" ++
+        "Block Flags:\t" ++ (lastFourBinaryDigits flag) ++ "\n" ++
+        "Block Input Counter:\t" ++ (show incr) ++ "\n" ++
+        "Block Output Counter:\t" ++ (show oucr) ++ "\n\n" ++
+        "Transactions:\n" ++ "Coinbase: \n" ++ "(show coinbase)" ++ "\nRegular: \n" ++
+        "(show txs)" ++ "\n" ++
+        "Additional data:\nHex form: " ++ (byteStringToHex additional) ++ "\nConverted: \n" ++
+        (BSU.toString additional)
         
 -- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
 difficulty :: Integer -> Integer
@@ -103,7 +117,7 @@ generateGenesis =
           genesisOutput = (TxOutput "1Curry58bkekKypHUv6wm82XDqnNzgsZNy" 100)
           genesisTX = Transaction [genesisCoinbase] [(genesisOutput, getTXID genesisOutput genesisCoinbase)] [] -- No sig for coinbase
           genesisCoinbase = (B.pack [0x0])
-          template = BlockTemplate (B.pack [0x1]) flagConst 0 0 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks")
+          template = BlockTemplate (B.pack [0x1]) flagConst 1 1 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks") 
           templateHash = takeHash template
           rootHash = hashEmptyTree
           prevHash = hashEmptyTree

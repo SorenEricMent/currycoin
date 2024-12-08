@@ -10,6 +10,7 @@ import Numeric (showHex, readHex)
 import Data.List (intercalate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BSU
+import Data.Bits (testBit)
 
 type Hash = B.ByteString
 type Amount = Integer
@@ -43,6 +44,15 @@ hexToByteString hexStr
 -- Convert Int to ByteString.UTF8
 intToByteString :: Int -> BSU.ByteString
 intToByteString n = BSU.fromString (show n)
+
+-- Convert a bytestring to its last four bin digit, for flag display, helped by GPT
+lastFourBinaryDigits :: B.ByteString -> String
+lastFourBinaryDigits bs =
+    let fullBinary = concatMap byteToBinaryString (B.unpack bs)
+    in drop (length fullBinary - 4) fullBinary
+  where
+    byteToBinaryString :: Word8 -> String
+    byteToBinaryString w = [if testBit w i then '1' else '0' | i <- [7,6..0]]
 
 -- Helper function to split a string into chunks of the given size
 chunksOf :: Int -> [a] -> [[a]]
