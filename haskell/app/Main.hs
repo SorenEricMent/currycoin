@@ -88,9 +88,6 @@ shell = do
                     Just "show_tx_pool" -> do
                         liftIO $ putStrLn "placehold"
                         liftIO $ evalStateT shell currentState
-                    Just "show_tx" -> do
-                        liftIO $ putStrLn "placehold"
-                        liftIO $ evalStateT shell currentState
                     Just "show_utxo" -> do
                         liftIO $ putStrLn $ showUTXO $ utxo currentState
                         liftIO $ evalStateT shell currentState
@@ -114,6 +111,7 @@ shell = do
                         case (words (input_data))!?1 of
                             Just addr -> do
                                 let height = (length $ block currentState)
+                                let oldUTXO = utxo currentState
                                 let txs = txPool currentState
                                 let txsMaybe = if (txs == []) then Nothing else Just (createMerkleTreeFromList txs)
                                 let prevBlock = (block currentState)!!(height-1) -- Previous block is guanranteed with genesis
@@ -125,7 +123,7 @@ shell = do
                                 let newState = GlobalState {
                                     block = (block currentState) ++ [newBlock],
                                     txPool = [],
-                                    utxo = [] -- todo
+                                    utxo = oldUTXO ++ (getOutput (fromJust (getCoinbase newBlock))) ++ (foldr (++) [] (map getOutput txs)) 
                                                         }
                                 liftIO $ evalStateT shell newState
                             Nothing -> do
