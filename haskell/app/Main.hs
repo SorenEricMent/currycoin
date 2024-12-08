@@ -11,12 +11,15 @@ import Data.ByteString.Base58
 import Data.Maybe (listToMaybe, fromJust)
 import Data.List (intercalate, intersperse)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.UTF8 as BSU
+
 import Currycoin.Data.MerkleTree
 
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
 import System.IO (hFlush, stdout)
 import System.Console.Haskeline
+import Data.Maybe (isNothing, fromJust)
 
 data GlobalState = GlobalState {
     -- Todo
@@ -113,8 +116,10 @@ shell = do
                                 let height = (length $ block currentState)
                                 let txs = txPool currentState
                                 let txsMaybe = if (txs == []) then Nothing else Just (createMerkleTreeFromList txs)
-                                let prevHash = B.pack [0x0] -- todo
-                                let additional = B.pack [0x0] -- todo
+                                let prevBlock = (block currentState)!!(height-1) -- Previous block is guanranteed with genesis
+                                let prevHash = takeHash prevBlock
+                                let additionalList = snd (splitAt 2 (words (input_data)))
+                                let additional = (if (additionalList == []) then B.pack [0x0] else BSU.fromString $ unwords $ additionalList)
                                 liftIO $ putStrLn "Started mining!"
                                 let !newBlock = mintBlock (B.pack [0x1]) flagConst addr txsMaybe (fromIntegral height) prevHash additional
                                 let newState = GlobalState {

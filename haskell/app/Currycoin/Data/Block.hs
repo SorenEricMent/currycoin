@@ -29,6 +29,10 @@ data BlockTemplate = BlockTemplate Version
                                    -- AdditionalData, Hash is previous hash
                                    B.ByteString
 
+instance Hashable Block where
+    serialize (PrunedBlock a b c _ _) = (hash . B.concat) [a, b, c]
+    serialize (FullBlock a b c _ _ _) = (hash . B.concat) [a, b, c]
+    
 instance Hashable BlockTemplate where
     serialize (BlockTemplate version flag incr oucr coinbase txs additional) =
         B.concat [version,
@@ -61,13 +65,15 @@ instance Show Block where
         "Block Root Hash:\t" ++ (byteStringToHex rootHash) ++ "\n" ++
         "Included previous hash:\t" ++ (byteStringToHex prevHash) ++ "\n" ++
         "Block POW Hash:\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
-        "Block Nonce:\t\t" ++ (show nonce) ++ "\n"
+        "Block Nonce:\t\t" ++ (show nonce) ++ "\n" ++
+        "Final Block Hash for chaining:\t" ++ byteStringToHex (takeHash (PrunedBlock templateHash rootHash prevHash nonce powHash)) ++ "\n"
     show (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional)) =
         "\n\ESC[36mLocally Stored Block\ESC[0m\n" ++
         "Block Template Hash:\t" ++ (byteStringToHex templateHash) ++ "\n" ++
         "Block Root Hash:\t" ++ (byteStringToHex rootHash) ++ "\n" ++
         "Included previous hash:\t" ++ (byteStringToHex prevHash) ++ "\n" ++
         "Block POW Hash:\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
+        "Final Block Hash for chaining:\t" ++ byteStringToHex (takeHash (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional))) ++ "\n" ++
         "Block Nonce:\t\t" ++ (show nonce) ++ "\n\n" ++
         "Block Version:\t\t" ++ (byteStringToHex version) ++ "\n" ++
         "Block Flags:\t\t" ++ (lastFourBinaryDigits flag) ++ "\n" ++
@@ -76,7 +82,7 @@ instance Show Block where
         "Transactions:\n" ++ "\tCoinbase: \n" ++ (show coinbase) ++ "\n\tRegular: \n" ++
         (show txs) ++ "\n\n" ++
         "Additional data:\nHex form: " ++ (byteStringToHex additional) ++ "\nConverted: \n" ++
-        (BSU.toString additional)
+        (BSU.toString additional) ++ "\n"
         
 -- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
 difficulty :: Integer -> Integer
