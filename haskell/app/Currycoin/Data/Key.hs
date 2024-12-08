@@ -14,6 +14,9 @@ processPubKeyFromLib (PubKey bs) =
     where
       sres = (splitAt 32 . reverse . B.unpack) bs
 
+processPubKeyToLib :: BSU.ByteString -> PubKey
+processPubKeyToLib pubkey = undefined
+
 pubkeyToAddress :: PubKey -> String
 pubkeyToAddress pubkey =
     show ((encodeBase58 bitcoinAlphabet (addChecksum (B.append (B.pack [0x00]) (Crypto.Hash.RIPEMD160.hash (Crypto.Hash.SHA256.hash (processPubKeyFromLib pubkey)))))))
@@ -22,5 +25,4 @@ pubkeyToAddress pubkey =
       addChecksum bs = B.append bs (B.take 4 (Crypto.Hash.SHA256.hash (Crypto.Hash.SHA256.hash bs)))
 
 genPrivateKey = Crypto.Hash.SHA256.hash <$> getEntropy 32
-
 

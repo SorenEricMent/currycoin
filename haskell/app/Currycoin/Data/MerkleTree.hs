@@ -1,7 +1,8 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE GADTs #-}
-
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DataKinds #-}
 module Currycoin.Data.MerkleTree where
 
 import Currycoin.Common
@@ -11,12 +12,18 @@ import qualified Data.ByteString.UTF8 as BSU
 -- https://wiki.haskell.org/Data_declaration_with_constraint
 -- https://wiki.haskell.org/Generalised_algebraic_datatype
 -- https://stackoverflow.com/a/40825913: Not a good idea?
+
 data MerkleTree a where
     INode :: Hash -> MerkleTree a -> MerkleTree a -> MerkleTree a
     LeafNode :: Hashable a => Hash -> a -> MerkleTree a
 
 instance Show (MerkleTree String) where
     show = drawMerkleTree
+
+accumulator :: Hashable a => (Hash -> a -> b) -> (b -> b -> b) -> MerkleTree a -> b                
+accumulator leafFunc combFunc = run where
+  run (LeafNode h x) = leafFunc h x
+  run (INode _ l r) = combFunc (run l) (run r)
 
 -- https://hackage.haskell.org/package/containers-0.5.7.1/docs/src/Data.Tree.html#drawTree
 -- Had to limit it to MerkleTree String instead of MerkleTree a here
@@ -158,4 +165,3 @@ proveHashableInclusion rootHash y proofPath =
         if isRight
         then takeHash (B.append acc siblingHash)  -- Right sibling: append current hash first
         else takeHash (B.append siblingHash acc)  -- Left sibling: append sibling hash first
-

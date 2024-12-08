@@ -75,6 +75,9 @@ mining target nonce diff =
   where
     currentHash = hash (B.concat [target, intToByteString (fromIntegral nonce)])
 
+mintBlock :: Version -> Flag -> String -> (Maybe (MerkleTree Transaction)) -> Integer -> Hash -> BSU.ByteString -> Block -- Address, tx to be included, diff, previous hash
+mintBlock v f addr txs diff prevhash additional = undefined
+
 verifyPOW :: Hash -> Hash -> Integer -> Bool -- Does not check difficulty
 verifyPOW target result nonce = result == (Crypto.Hash.SHA256.hash (B.concat [target, intToByteString (fromIntegral nonce)]))
 -- e.g. verifyPOW (hexToByteString "1a2b3d") (hexToByteString "0538c0b1223aad095feefecb31ebb517fd2f730e97a3cfbf01c3d235a3edb387") 9 -> True
