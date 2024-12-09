@@ -99,6 +99,13 @@ Simply execute `stack build`, if you want to inspect on our example functions, r
 #### How to use the Currycoin shell
 For the final evaluation, you might want to use `stack run` for the Currycoin shell! This section is going to guide you to use it.
 
+> If you are having trouble with stack, you can try the following to run with cabal instead:
+> 1. Ensure `cabal` is installed on your system
+> 2. Install hpack using `stack install hpack`
+> 3. Generate project files for cabal using `hpack`
+> 4. Run `cabal install` and then `cabal build`
+> 5. You should be able to run the program now with `cabal run`
+
 Upon executing the command, you will be meet with the shell, the shell is just the shell you would have expected what a shell to be, but with only the basic syntax [command] <parameters>
 ##### Command: init
 init takes no parameters, it restore the whole program to the initial state.
