@@ -50,20 +50,47 @@ showUTXO utxo = intercalate "\n" (map singleOutputShow utxo)
     
 type AppState = StateT GlobalState IO
 
-getInputHashes :: Int -> [Hash] -> IO ([Hash])
-getInputHashes times accumulate =
-    case times of
-        0 ->
-            return accumulate
-        _ ->
+lookupUTXO :: [(TxOutput, Hash)] -> Hash -> Maybe (TxOutput, Hash)
+lookupUTXO utxo hash = if (length l) == 0 then Nothing else Just (head l)
+    where l = filter (\u -> hash == (snd u)) utxo
+
+getInputHashes :: [(TxOutput, Hash)] -> [(TxOutput, Hash)] -> IO ([(TxOutput, Hash)])
+getInputHashes utxo acc =
             runInputT defaultSettings $ do
-                input <- getInputLine "Input Hash: "
+                input <- getInputLine ("Input Hash (EOF to end) [" ++ (show (length acc)) ++ "]: ")
                 case input of
                     Just input_data ->
-                        liftIO $ getInputHashes (times - 1)  (accumulate ++ [hexToByteString input_data])
+                        case (lookupUTXO utxo (hexToByteString input_data)) of
+                            Just u -> do
+                                liftIO $ getInputHashes utxo (acc ++ [u])
+                            Nothing -> do
+                                liftIO $ putStrLn "Invalid hash: not in UTXO! Current UTXO:"
+                                liftIO $ putStrLn $ showUTXO $ utxo
+                                liftIO $ getInputHashes utxo acc
                     Nothing -> do
-                        outputStr "Invalid input."
-                        liftIO $ getInputHashes times accumulate
+                        return acc
+
+getOutputs :: Integer -> [(Address, Integer)] -> IO ([(Address, Integer)])
+getOutputs total acc =
+            runInputT defaultSettings $ do
+                input <- getInputLine ("Output Address (EOF to end) [" ++ (show (length acc)) ++ "]: ")
+                case input of
+                    Just input_data -> do
+                        input2 <- getInputLine "Amount: "
+                        case input2 of
+                            Just input_data2 ->
+                                    case (readMaybe input_data2) of
+                                        Just y -> do
+                                            liftIO $ getOutputs total (acc ++ [(hexToByteString input_data, y)])
+                                        Nothing -> do
+                                            liftIO $ putStrLn "Invalid amount"
+                                            liftIO $ getOutputs total acc
+                    Nothing -> do
+                        if (sum (map snd acc)) /= total then do
+                                liftIO $ putStrLn ("Total amount must be " ++ (show total) ++ "!")
+                                liftIO $ getOutputs total acc
+                        else
+                                return acc
 
 shell :: AppState ()
 shell = do
@@ -85,10 +112,10 @@ shell = do
                         liftIO $ evalStateT shell currentState
                     Just "new_address" -> do
                         private_key <- liftIO $ genPrivateKey
-                        let pubKey = derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)
-                        liftIO $ putStrLn $ "New private key:\t" ++ (show . byteStringToHex) private_key
-                        liftIO $ putStrLn $ "New public key:\t\t" ++ (show . byteStringToHex . processPubKeyFromLib) pubKey
-                        liftIO $ putStrLn $ "New public address:\t" ++ (pubkeyToAddress pubKey)
+                        let pubKey = (processPubKeyFromLib (derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)))
+                        liftIO $ putStrLn $ "New private key:\t" ++ byteStringToHex private_key
+                        liftIO $ putStrLn $ "New public key:\t\t" ++ byteStringToHex pubKey
+                        liftIO $ putStrLn $ "New public address:\t" ++ (byteStringToHex . pubkeyToAddress) pubKey
                         liftIO $ evalStateT shell currentState
                     Just "height" -> do
                         case (block currentState)!?0 of
@@ -99,19 +126,13 @@ shell = do
                         liftIO $ evalStateT shell currentState
                     Just "new_tx" -> do
                         -- new_state <- liftIO $ new_tx 3 ""
-                        input_num <- getInputLine "Please input the number of Transaction inputs (UTXOs)"
-                        case input_num of
-                            Just x ->
-                                case (readMaybe $ fromJust input_num) of
-                                    Just y -> do
-                                        input_list <- liftIO $ getInputHashes y []
-                                        liftIO $ evalStateT shell currentState -- Todo
-                                    Nothing -> do
-                                        liftIO $ putStrLn "Invalid numerical input!"
-                                        liftIO $ evalStateT shell currentState
-                            Nothing -> do
-                                liftIO $ putStrLn "Invalid numerical input!"
-                                liftIO $ evalStateT shell currentState
+                        input_list <- liftIO $ getInputHashes (utxo currentState) []
+                        if (length input_list == 0) then do
+                            liftIO $ putStrLn "No hash input!"
+                            liftIO $ evalStateT shell currentState
+                        else do
+                            outputs <- liftIO $ getOutputs (sum (map (\((TxOutput _ amount), _) -> fromIntegral amount) input_list)) []
+                            liftIO $ evalStateT shell currentState
                     Just "show_tx_pool" -> do
                         liftIO $ putStrLn (show $ txPool $ currentState)
                         liftIO $ evalStateT shell currentState

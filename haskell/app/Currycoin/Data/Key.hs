@@ -8,18 +8,21 @@ import Crypto.Hash.RIPEMD160
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BSU
 
-processPubKeyFromLib :: PubKey -> BSU.ByteString
+type Address = B.ByteString
+type MyPubKey = BSU.ByteString
+
+processPubKeyFromLib :: PubKey -> MyPubKey
 processPubKeyFromLib (PubKey bs) =
     B.pack ([0x4] ++ (snd sres) ++ (fst sres))
     where
       sres = (splitAt 32 . reverse . B.unpack) bs
 
-processPubKeyToLib :: BSU.ByteString -> PubKey
+processPubKeyToLib :: MyPubKey -> PubKey
 processPubKeyToLib pubkey = undefined
 
-pubkeyToAddress :: PubKey -> String
+pubkeyToAddress :: MyPubKey -> Address
 pubkeyToAddress pubkey =
-    show ((encodeBase58 bitcoinAlphabet (addChecksum (B.append (B.pack [0x00]) (Crypto.Hash.RIPEMD160.hash (Crypto.Hash.SHA256.hash (processPubKeyFromLib pubkey)))))))
+    encodeBase58 bitcoinAlphabet (addChecksum (B.append (B.pack [0x00]) (Crypto.Hash.RIPEMD160.hash (Crypto.Hash.SHA256.hash pubkey))))
     where
       addChecksum :: B.ByteString -> B.ByteString
       addChecksum bs = B.append bs (B.take 4 (Crypto.Hash.SHA256.hash (Crypto.Hash.SHA256.hash bs)))
