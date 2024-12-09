@@ -3,7 +3,5 @@ compiler-check: newer-minor
 
 packages:
 - .
-dependencies:
-  - cryptohash-sha256
 extra-deps:
   - ppad-ripemd160-0.1.0@sha256:5fba8bfb7ff399fd48d6e2afa0da22d5baf5fdc945a4d600e0d333b2c98202bf,1425
