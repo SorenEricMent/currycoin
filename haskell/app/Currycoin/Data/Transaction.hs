@@ -31,6 +31,9 @@ instance Hashable (Maybe (MerkleTree Transaction)) where
     serialize (Just x) = serialize x
     serialize Nothing = B.pack [0x0]
 
+instance {-# OVERLAPS #-} Show [Transaction] where
+    show txs = concat (intersperse "\n" (map show txs))
+
 instance Show Transaction where
     show (Transaction ins outs []) =
         "Inputs: \n" ++ (inputsToString ins) ++ "\n" ++

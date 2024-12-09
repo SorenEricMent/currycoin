@@ -12,6 +12,7 @@ import Data.Maybe (listToMaybe, fromJust)
 import Data.List (intercalate, intersperse)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BSU
+import Text.Read (readMaybe)
 
 import Currycoin.Data.MerkleTree
 
@@ -50,6 +51,21 @@ showUTXO utxo = intercalate "\n" (map singleOutputShow utxo)
     
 type AppState = StateT GlobalState IO
 
+getInputHashes :: Int -> [Hash] -> IO ([Hash])
+getInputHashes times accumulate =
+    case times of
+        0 ->
+            return accumulate
+        _ ->
+            runInputT defaultSettings $ do
+                input <- getInputLine "Input Hash: "
+                case input of
+                    Just input_data ->
+                        liftIO $ getInputHashes (times - 1)  (accumulate ++ [hexToByteString input_data])
+                    Nothing -> do
+                        outputStr "Invalid input."
+                        liftIO $ getInputHashes times accumulate
+
 shell :: AppState ()
 shell = do
     currentState <- get
@@ -83,10 +99,22 @@ shell = do
                                 liftIO $ putStrLn "No block exists in the database."
                         liftIO $ evalStateT shell currentState
                     Just "new_tx" -> do
-                        liftIO $ putStrLn "placehold"
-                        liftIO $ evalStateT shell currentState
+                        -- new_state <- liftIO $ new_tx 3 ""
+                        input_num <- getInputLine "Please input the number of Transaction inputs (UTXOs)"
+                        case input_num of
+                            Just x ->
+                                case (readMaybe $ fromJust input_num) of
+                                    Just y -> do
+                                        input_list <- liftIO $ getInputHashes y []
+                                        liftIO $ evalStateT shell currentState -- Todo
+                                    Nothing -> do
+                                        liftIO $ putStrLn "Invalid numerical input!"
+                                        liftIO $ evalStateT shell currentState
+                            Nothing -> do
+                                liftIO $ putStrLn "Invalid numerical input!"
+                                liftIO $ evalStateT shell currentState
                     Just "show_tx_pool" -> do
-                        liftIO $ putStrLn "placehold"
+                        liftIO $ putStrLn (show $ txPool $ currentState)
                         liftIO $ evalStateT shell currentState
                     Just "show_utxo" -> do
                         liftIO $ putStrLn $ showUTXO $ utxo currentState
