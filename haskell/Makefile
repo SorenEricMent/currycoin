@@ -1,17 +1,22 @@
 SECP256K1_DIST=$(shell pwd)/secp256k1_dist/
-
+.PHONY: scep256k1_lib
 $(shell pkg-config libsecp256k1)
 ifeq "$(.SHELLSTATUS)" "0"
 $(warning "libsecp256k1 exists")
 
-.PHONY: scep256k1_dist
-secp256k1_dist:
+secp256k1_lib:
+	@echo "No need to build secp256k1"
 else
 $(warning "libsecp256k1 does not exist")
+secp256k1_lib: secp256k1_dist
+	$(eval PKG_CONFIG_PATH+=$(SECP256K1_DIST)/usr/lib/pkgconfig/)
+	$(eval export PKG_CONFIG_PATH)
+	$(eval LD_LIBRARY_PATH+=$(shell pkg-config --libs-only-L libsecp256k1 | sed -e 's/-L\(.*\)/\1/g'))
+	$(eval export LD_LIBRARY_PATH)
+endif
 
-PKG_CONFIG_PATH=$(SECP256K1_DIST)/usr/lib/pkgconfig/
-export PKG_CONFIG_PATH
 secp256k1_dist: secp256k1
+	@echo "Building secp256k1"
 	cd secp256k1/ && autoreconf -vfi
 	cd secp256k1/ && ./configure \
 			--prefix=$(SECP256K1_DIST)/usr/ \
@@ -34,7 +39,10 @@ secp256k1_dist: secp256k1
 	cd secp256k1/ && make check
 	cd secp256k1/ && make install
 
-endif
+
+.PHONY: run
+run: secp256k1_lib
+	stack run
 
 .PHONY: clean
 clean:
@@ -42,7 +50,7 @@ clean:
 	rm -rf $(SECP256K1_DIST)
 
 .PHONY: build
-build: secp256k1_dist
+build: secp256k1_lib
 	stack build --test --no-run-tests
 
 .PHONY: test
@@ -50,7 +58,7 @@ test:
 	stack build --test
 
 .PHONY: ghci
-ghci:
+ghci: secp256k1_lib
 	stack ghci
 
 .PHONY: docs
