@@ -7,8 +7,8 @@ Currycoin is a simple blockchain implemented in Haskell. It provides a set of in
 This project is in fulfillment of the [CPSC 312 2024W1 project requirements](https://steven-wolfman.github.io/cpsc-312-website-2024W1/project.html).
 
 It is in such fulfillment as:
-+ It is built on our Haskell learning from CPSC 312
-+ Used useful new element of Haskell - the project relies on several cryptography libraries from Hackage, and several Haskell language extensions: as of now, FlexibleInstances, UndecidableInstances and GADTs
++ It is built on our Haskell learning from CPSC 312 - Like typeclasses, IO Monads...
++ Used useful new element of Haskell - we have went above and beyond: we used the Haskell's module system, the project relies on the understanding of a lot of cryptographies (It is a blockchain), the project has explored lots of Haskell language extensions like FlexibleInstances, UndecidableInstances, GADTs, typeclass overlaps... To the point that we have even hit some limits of Haskell's type system like unpromotable DataKinds (wish it is fully dependent-typed).
 + The meaningful problem solved: this project provided a way to "step" blockchain by simple function calls / commands, which is a nice way to visualize and learn how blockchain works.
 ## Team Members
 
@@ -26,7 +26,7 @@ We call ourselves: __Knights Of the Lambda Calculus__
 
 We surely built on the work of others! Here are resources and people we got support from:
 
-+ Our dependencies: cryptohash-sha256, ByteString, Crypto.Secp256k1, Haskeline
++ Our dependencies: cryptohash-sha256, ByteString, Crypto.Secp256k1, Haskeline... as shown in `package.yaml`
 + The Bitcoin Project, BIPs
 + ChatGPT, for making some helper function much easier (**All** code with help from this source has been labeled with comment about what help was given)
 
@@ -96,7 +96,25 @@ Examples of calling `testMerkleTree`
 
 #### Running Currycoin Shell (Not for PoC!)
 Simply execute `stack build`, if you want to inspect on our example functions, run `stack ghci`, if you want to enter the interactive terminal (Not yet in progress but will be in the actual phase of the project), run the executable from the build (`stack run`).
+#### How to use the Currycoin shell
+For the final evaluation, you might want to use `stack run` for the Currycoin shell! This section is going to guide you to use it.
 
+Upon executing the command, you will be meet with the shell, the shell is just the shell you would have expected what a shell to be, but with only the basic syntax [command] <parameters>
+##### Command: init
+init takes no parameters, it restore the whole program to the initial state.
+
+The initial state is the state the program begin with, it consists of:
+
+- A staticly generated Genesis block
+- A empty transaction pool
+- A single UTXO, which is the coinbase, in amount 100 payed to `1Curry58bkekKypHUv6wm82XDqnNzgsZNy` (Our key-addr scheme completely resemble the Bitcoin definition!)
+- Note: The private key to the address is `3c01d5bc28498b875af9056b78699f73a3d68ea41c1c30650081ca1d470f87e0`
+
+#### Command: show\_height
+show\_height takes no parameter, it gives you the height of the blockchain, for the initial state with only the genesis: 1
+
+#### Command: show\_utxo
+show\_utxo takes no parameter, it gives you the current UTXOs (Unspend transaction outputs), output hashes are unique, and they can only be spend once.
 <!--
 As it is currently set up, editing works best if you first `cd` into the `haskell` subdirectory and open VS Code on that directory (`code .`). There is a `Makefile` with some helpful aliases, but you can also just use `stack` as normal.
 
