@@ -23,7 +23,6 @@ import System.Console.Haskeline
 import Data.Maybe (isNothing, fromJust)
 
 data GlobalState = GlobalState {
-    -- Todo
     block :: [Block],
     txPool :: [Transaction],
     utxo :: [(TxOutput, Hash)]
@@ -82,7 +81,7 @@ shell = do
                         liftIO $ putStrLn "Reset all state to initial"
                         liftIO $ evalStateT shell initialState
                     Just "help" -> do
-                        liftIO $ putStrLn "exit, help, init, new_address, height, transact"
+                        liftIO $ putStrLn "exit, help, init, new_address, height, new_tx, show_block, show_utxo, show_tx_pool, show_utxo_addr"
                         liftIO $ evalStateT shell currentState
                     Just "new_address" -> do
                         private_key <- liftIO $ genPrivateKey
@@ -120,8 +119,14 @@ shell = do
                         liftIO $ putStrLn $ showUTXO $ utxo currentState
                         liftIO $ evalStateT shell currentState
                     Just "show_utxo_addr" -> do
-                        liftIO $ putStrLn "placehold"
-                        liftIO $ evalStateT shell currentState
+                        case (words (input_data))!?1 of
+                            Just x -> do
+                                liftIO $ putStrLn (x ++ " can spend the following outputs:")
+                                liftIO $ putStrLn (concat (intersperse "\n" (map show (filter (\((TxOutput addr _),_) -> addr == x) (utxo currentState)))))
+                                liftIO $ evalStateT shell currentState
+                            Nothing -> do
+                                liftIO $ putStrLn "Missing address to lookup."
+                                liftIO $ evalStateT shell currentState
                     Just "show_block" -> do
                         case (words (input_data))!?1 of
                             Just height ->

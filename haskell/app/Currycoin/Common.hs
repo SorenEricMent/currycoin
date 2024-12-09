@@ -31,6 +31,9 @@ instance Hashable B.ByteString where
 instance Show TxOutput where
     show (TxOutput addr amount) = "To: " ++ addr ++ "\nAmount: " ++ (show amount) ++ "\n"
 
+instance {-# OVERLAPS #-} Show (TxOutput, Hash) where
+    show (out, hash) = show out ++ (byteStringToHex hash)
+    
 -- Helper function section
 (!?) :: [a] -> Int -> Maybe a
 xs !? n
