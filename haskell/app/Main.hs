@@ -9,7 +9,7 @@ import Currycoin.Data.Block
 import Crypto.Secp256k1
 import Crypto.Hash.SHA256
 import Data.ByteString.Base58
-import Data.Maybe (listToMaybe, fromJust)
+import Data.Maybe (listToMaybe, isNothing, fromJust)
 import Data.List (intercalate, intersperse)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BSU
@@ -21,7 +21,6 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
 import System.IO (hFlush, stdout)
 import System.Console.Haskeline
-import Data.Maybe (isNothing, fromJust)
 import Data.List
 
 data GlobalState = GlobalState {
@@ -76,28 +75,27 @@ getInputHashes utxo acc = do
 
 getOutputs :: Amount -> [TxOutput] -> IO ([TxOutput])
 getOutputs total acc = do
-    input <- liftIO $ getInputLineValidated ("Output Address (EOF to end) [" ++ (show (length acc)) ++ "] " ++ amountstr ++ ": ")
-                                            validateAddr
-                                            ferrAddr
-    case input of
-        Just address -> do
-            input2 <- getInputLineValidated ("Amount " ++ amountstr ++ ": ")
-                                            validateAmount
-                                            ferrAmount
-            case input2 of
-                Just amount ->
-                    liftIO $ getOutputs total (acc ++ [(TxOutput address amount)])
-                Nothing ->
-                    liftIO $ getOutputs total acc
-        Nothing -> do
-            if curamount /= total then do
-                    liftIO $ putStrLn ("Total amount must be " ++ (show total) ++ "!")
-                    liftIO $ getOutputs total acc
-            else
-                    return acc
+    if (curamount == total) then do
+        return acc
+    else do
+        input <- liftIO $ getInputLineValidated ("Output Address (EOF to end) [" ++ (show (length acc)) ++ "] " ++ amountstr ++ ": ")
+                                                validateAddr
+                                                ferrAddr
+        case input of
+            Just address -> do
+                input2 <- getInputLineValidated ("Amount " ++ amountstr ++ ": ")
+                                                validateAmount
+                                                ferrAmount
+                case input2 of
+                    Just amount ->
+                        liftIO $ getOutputs total (acc ++ [(TxOutput address amount)])
+                    Nothing ->
+                        liftIO $ getOutputs total acc
+            Nothing -> do
+                    return []
     where validateAddr :: String -> Maybe String
           validateAddr s =
-              if ((length s) == 34) && ((length (filter (\(TxOutput addr _) -> addr == s) acc)) == 0) then
+              if ((length (filter (\(TxOutput addr _) -> addr == s) acc)) == 0) then
                   Just s
               else
                   Nothing
@@ -107,20 +105,30 @@ getOutputs total acc = do
           curamount = (sum (map txoToAmount acc))
           amountstr = "(" ++ (show curamount) ++ "/" ++ (show total) ++ ")"
 
-getKeys :: [UTXO] -> [(UTXO, MyPrivKey)] -> IO ([(UTXO, MyPrivKey)])
-getKeys [] acc = do return acc
-getKeys (utxo:us) acc = do
+getKeys :: Crypto.Secp256k1.Ctx -> [UTXO] -> [MyPrivKey] -> IO ([MyPrivKey])
+getKeys _ [] acc = do return acc
+getKeys ctx (utxo:us) acc = do
             liftIO $ putStrLn ("Enter the private key for the following UTXO to sign the transaction:\n" ++ (showUTXO utxo))
-            input <- getInputLineValidated ("Private key (" ++ (show (length us)) ++ " remaining): ")
+            input <- getInputLineValidated ("Private key for " ++ utxoaddr ++ " (" ++ (show (length us)) ++ " remaining): ")
                                            validate
                                            ferr
             case input of
                 Just k -> do
-                    liftIO $ getKeys us (acc ++ [(utxo, hexToByteString k)])
+                    liftIO $ getKeys ctx us (acc ++ [k])
                 Nothing -> do
                     return acc
-    where validate s = if ((length s) == 64) then Just s else Nothing
-          ferr s = putStrLn ("Invalid private key: " ++ s) >> return True
+    where ferr s = putStrLn ("Invalid private key: " ++ s) >> return True
+          utxoaddrf (UTXO (TxOutput address _) _) = address
+          utxoaddr = utxoaddrf utxo
+          validate s =
+              if (addr == utxoaddr) then
+                  Just privkey
+              else
+                  Nothing
+              where
+                  privkey = hexToByteString s
+                  pubKey = (processPubKeyFromLib (derivePubKey ctx (Crypto.Secp256k1.SecKey privkey)))
+                  addr = (addressToString . pubkeyToAddress) pubKey
 
 newUTXO :: Hash -> TxOutput -> UTXO
 newUTXO hash txo = UTXO txo bh
@@ -128,8 +136,20 @@ newUTXO hash txo = UTXO txo bh
         bs = B.pack ((B.unpack hash) ++ (B.unpack (takeHash txo)))
         bh = Crypto.Hash.SHA256.hash bs
 
-newTX :: [UTXO] -> IO (Maybe (Transaction, [UTXO]))
-newTX utxo = do
+signTX :: Crypto.Secp256k1.Ctx -> Transaction -> [MyPrivKey] -> Transaction
+signTX ctx (Transaction inputs outputs signatures) kk =
+    Transaction inputs outputs (sf kk)
+    where sf [] = []
+          sf (k:ks) = [ss] ++ (sf ks)
+              where sk = Crypto.Secp256k1.SecKey k
+                    sg = signMsg ctx sk ms
+                    ss = get sg
+                    get (Sig s) = s
+          tx = (Transaction inputs outputs signatures)
+          ms = (fromJust . msg . takeHash) tx
+
+newTX :: Crypto.Secp256k1.Ctx -> [UTXO] -> IO (Maybe (Transaction, [UTXO]))
+newTX ctx utxo = do
     inputs <- liftIO $ getInputHashes utxo []
     let inamount = sum (map (\(UTXO (TxOutput _ amount) _) -> fromIntegral amount) inputs)
     if (length inputs == 0) then do
@@ -138,7 +158,6 @@ newTX utxo = do
     else do
         outputs <- liftIO $ getOutputs inamount []
         if (length outputs == 0) then do
-            liftIO $ putStrLn "No outputs!"
             return Nothing
         else do
             let ins = map (\(UTXO _ h) -> h) inputs
@@ -146,9 +165,13 @@ newTX utxo = do
             let out = map (\o -> newUTXO inhash o) outputs
             let tx = Transaction ins out []
             liftIO $ putStrLn ("Creating and signing the following transaction:\n" ++ (show tx))
-            combined <- liftIO $ getKeys inputs []
-            let res = (tx, inputs)
-            return (Just res)
+            keys <- liftIO $ getKeys ctx inputs []
+            if (length keys == 0) then do
+                return Nothing
+            else do
+                let txsigned = signTX ctx tx keys
+                let res = (txsigned, inputs)
+                return (Just res)
 
 shell :: AppState ()
 shell = do
@@ -166,14 +189,25 @@ shell = do
                         liftIO $ putStrLn "Reset all state to initial"
                         liftIO $ evalStateT shell initialState
                     Just "help" -> do
-                        liftIO $ putStrLn "exit, help, init, new_address, height, new_tx, show_block, show_utxo, show_tx_pool, show_utxo_addr"
+                        liftIO $ putStrLn "init\t\t\t\t\tReset to initial state"
+                        liftIO $ putStrLn "exit\t\t\t\t\tExit the program"
+                        liftIO $ putStrLn "help\t\t\t\t\tShow this help"
+                        liftIO $ putStrLn "new_address\t\t\t\tGenerate a new private key, public key, and Bitcoin address"
+                        liftIO $ putStrLn "height\t\t\t\t\tShow the latest block height"
+                        liftIO $ putStrLn "new_tx\t\t\t\t\tCreate a new transaction"
+                        liftIO $ putStrLn "show_block height\t\t\tShow the block at the specific height"
+                        liftIO $ putStrLn "show_utxo\t\t\t\tShow UTXOs"
+                        liftIO $ putStrLn "show_tx_pool\t\t\t\tShow transaction pool"
+                        liftIO $ putStrLn "show_utxo_addr address\t\t\tFilter UTXO by address"
+                        liftIO $ putStrLn "mint_block address\t\t\tMine a block and send coinbase to the specific address"
+                        liftIO $ putStrLn "verify_tx height hash pubkeys ...\tVerify a transaction"
                         liftIO $ evalStateT shell currentState
                     Just "new_address" -> do
                         private_key <- liftIO $ genPrivateKey
                         let pubKey = (processPubKeyFromLib (derivePubKey ctx (Crypto.Secp256k1.SecKey private_key)))
                         liftIO $ putStrLn $ "New private key:\t" ++ byteStringToHex private_key
                         liftIO $ putStrLn $ "New public key:\t\t" ++ byteStringToHex pubKey
-                        liftIO $ putStrLn $ "New public address:\t" ++ (byteStringToHex . pubkeyToAddress) pubKey
+                        liftIO $ putStrLn $ "New public address:\t" ++ (addressToString . pubkeyToAddress) pubKey
                         liftIO $ evalStateT shell currentState
                     Just "height" -> do
                         case (block currentState)!?0 of
@@ -183,7 +217,7 @@ shell = do
                                 liftIO $ putStrLn "No block exists in the database."
                         liftIO $ evalStateT shell currentState
                     Just "new_tx" -> do
-                        tx <- liftIO $ newTX (utxo currentState)
+                        tx <- liftIO $ newTX ctx (utxo currentState)
                         case tx of
                             Just ((Transaction inputs outputs signatures), inputUTXOs) -> do
                                 let newState = GlobalState {
@@ -200,6 +234,29 @@ shell = do
                     Just "show_utxo" -> do
                         liftIO $ putStrLn $ showUTXOs $ utxo currentState
                         liftIO $ evalStateT shell currentState
+                    Just "verify_tx" -> do
+                        let w = words input_data
+                        if (length w) > 3 then do
+                            let h = (hexToByteString . fromJust) (w!?2)
+                            let s = map hexToByteString (snd (splitAt 3 w))
+                            case (block currentState)!?(((read . fromJust) (w!?1))-1) of
+                                Just blk -> do
+                                    case (findTX blk h) of
+                                        Just tx -> do
+                                            if (verifyTX ctx tx s) then
+                                                liftIO $ putStrLn "The transaction is verified"
+                                            else
+                                                liftIO $ putStrLn "The transaction cannot be verified"
+                                            liftIO $ evalStateT shell currentState
+                                        Nothing -> do
+                                            liftIO $ putStrLn "Transaction not found in the specific block"
+                                            liftIO $ evalStateT shell currentState
+                                Nothing -> do
+                                    liftIO $ putStrLn "No block with such height exists!"
+                                    liftIO $ evalStateT shell currentState
+                        else do
+                            liftIO $ putStrLn "Usage: verify_tx height hash pubkeys ..."
+                            liftIO $ evalStateT shell currentState
                     Just "show_utxo_addr" -> do
                         case (words (input_data))!?1 of
                             Just x -> do

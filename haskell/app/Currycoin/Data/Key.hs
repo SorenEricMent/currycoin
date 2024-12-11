@@ -19,7 +19,10 @@ processPubKeyFromLib (PubKey bs) =
       sres = (splitAt 32 . reverse . B.unpack) bs
 
 processPubKeyToLib :: MyPubKey -> PubKey
-processPubKeyToLib pubkey = undefined
+processPubKeyToLib pubkey =
+    PubKey (B.pack ((snd sres) ++ (fst sres)))
+    where
+      sres = (splitAt 32 . reverse . tail . B.unpack) pubkey
 
 pubkeyToAddress :: MyPubKey -> Address
 pubkeyToAddress pubkey =
@@ -31,3 +34,5 @@ pubkeyToAddress pubkey =
 genPrivateKey :: IO MyPrivKey
 genPrivateKey = Crypto.Hash.SHA256.hash <$> getEntropy 32
 
+addressToString :: Address -> String
+addressToString = BSU.toString

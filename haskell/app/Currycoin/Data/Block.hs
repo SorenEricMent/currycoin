@@ -58,31 +58,43 @@ getCoinbase :: Block -> Maybe Transaction
 getCoinbase (PrunedBlock _ _ _ _ _) = Nothing
 getCoinbase (FullBlock _ _ _ _ _ (BlockTemplate _ _ _ _ coinbase _ _)) = Just coinbase
 
+findTX :: Block -> Hash -> Maybe Transaction
+findTX (PrunedBlock _ _ _ _ _) _ = Nothing
+findTX (FullBlock _ _ _ _ _ (BlockTemplate _ _ _ _ _ Nothing _)) _ = Nothing
+findTX (FullBlock _ _ _ _ _ (BlockTemplate _ _ _ _ _ (Just mt) _)) hash =
+    lookup (convertMerkleTreeToList mt)
+    where
+        lookup [] = Nothing
+        lookup (t:txs) | hash == (takeHash t) = Just t
+                       | otherwise = lookup txs
+
 instance Show Block where
     show (PrunedBlock templateHash rootHash prevHash nonce powHash) =
-        "\n\ESC[36mPruned block, Block hash\ESC[0m\n\n" ++
-        "Block Template Hash:\t" ++ (byteStringToHex templateHash) ++ "\n" ++
-        "Block Root Hash:\t" ++ (byteStringToHex rootHash) ++ "\n" ++
-        "Included previous hash:\t" ++ (byteStringToHex prevHash) ++ "\n" ++
-        "Block POW Hash:\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
-        "Block Nonce:\t\t" ++ (show nonce) ++ "\n" ++
+        "\ESC[36mPruned block, Block hash\ESC[0m\n\n" ++
+        "Block Template Hash:\t\t" ++ (byteStringToHex templateHash) ++ "\n" ++
+        "Block Root Hash:\t\t" ++ (byteStringToHex rootHash) ++ "\n" ++
+        "Included previous hash:\t\t" ++ (byteStringToHex prevHash) ++ "\n" ++
+        "Block POW Hash:\t\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
+        "Block Nonce:\t\t\t\t" ++ (BSU.toString nonce) ++ "\n" ++
         "Final Block Hash for chaining:\t" ++ byteStringToHex (takeHash (PrunedBlock templateHash rootHash prevHash nonce powHash)) ++ "\n"
     show (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional)) =
-        "\n\ESC[36mLocally Stored Block\ESC[0m\n" ++
-        "Block Template Hash:\t" ++ (byteStringToHex templateHash) ++ "\n" ++
-        "Block Root Hash:\t" ++ (byteStringToHex rootHash) ++ "\n" ++
-        "Included previous hash:\t" ++ (byteStringToHex prevHash) ++ "\n" ++
-        "Block POW Hash:\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
+        "\ESC[36mLocally Stored Block\ESC[0m\n" ++
+        "Block Template Hash:\t\t" ++ (byteStringToHex templateHash) ++ "\n" ++
+        "Block Root Hash:\t\t" ++ (byteStringToHex rootHash) ++ "\n" ++
+        "Included previous hash:\t\t" ++ (byteStringToHex prevHash) ++ "\n" ++
+        "Block POW Hash:\t\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
         "Final Block Hash for chaining:\t" ++ byteStringToHex (takeHash (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional))) ++ "\n" ++
-        "Block Nonce:\t\t" ++ (show nonce) ++ "\n\n" ++
+        "Block Nonce:\t\t\t" ++ (BSU.toString nonce) ++ "\n" ++
         "Block Version:\t\t" ++ (byteStringToHex version) ++ "\n" ++
         "Block Flags:\t\t" ++ (lastFourBinaryDigits flag) ++ "\n" ++
         "Block Input Counter:\t" ++ (show incr) ++ "\n" ++
-        "Block Output Counter:\t" ++ (show oucr) ++ "\n\n" ++
-        "Transactions:\n" ++ "\tCoinbase: \n" ++ (show coinbase) ++ "\n\tRegular: \n" ++
-        (show txs) ++ "\n\n" ++
-        "Additional data:\nHex form: " ++ (byteStringToHex additional) ++ "\nConverted: \n" ++
-        (BSU.toString additional) ++ "\n"
+        "Block Output Counter:\t" ++ (show oucr) ++ "\n" ++
+        "\ESC[36mTransactions\ESC[0m\n" ++
+        "\ESC[36mCoinbase:\ESC[0m\n" ++ (show coinbase) ++ "\n" ++
+        "\ESC[36mRegular:\ESC[0m\n" ++ (show txs) ++ "\n" ++
+        "\ESC[36mAdditional Data\ESC[0m\n" ++
+        "Hex form: " ++ (byteStringToHex additional) ++ "\nConverted: \n" ++
+        (BSU.toString additional)
         
 -- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
 difficulty :: Integer -> Integer

@@ -4,7 +4,10 @@ module Currycoin.Data.Transaction where
 
 import Currycoin.Data.MerkleTree
 import Crypto.Hash.SHA256
+import Crypto.Secp256k1
 import Currycoin.Common
+import Currycoin.Data.Key
+import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.UTF8 as BSU
 import Data.List (intersperse)
@@ -41,13 +44,17 @@ instance {-# OVERLAPS #-} Show [Transaction] where
     show txs = concat (intersperse "\n" (map show txs))
 
 instance Show Transaction where
-    show (Transaction ins outs []) =
+    show (Transaction ins outs sigs) =
         "Inputs: \n" ++ (inputsToString ins) ++ "\n" ++
-        "Outputs: \n" ++ concat (intersperse "\n" (map (\o -> "- " ++ show o) outs))
-        where inputsToString [] = "No inputs."
+        "Outputs: \n" ++ (outputsToString outs) ++ "\n" ++
+        "Signatures: \n" ++ (sigsToString sigs) ++ "\n" ++
+        "Hash: " ++ (hashToString (Transaction ins outs sigs))
+        where inputsToString [] = "- No inputs."
               inputsToString ins = concat (intersperse "\n" (map (\h -> "- " ++ byteStringToHex h) ins))
-    show (Transaction ins outs sigs) = (show (Transaction ins outs [])) ++ "\nSignatures: " ++
-        concat (intersperse "\n" (map show sigs))
+              outputsToString outs = concat (intersperse "\n" (map (\o -> "- " ++ show o) outs))
+              sigsToString [] = "- No signatures."
+              sigsToString ins = concat (intersperse "\n" (map (\h -> "- " ++ byteStringToHex h) sigs))
+              hashToString tx = (byteStringToHex . takeHash) tx
 
 instance Show (MerkleTree Transaction) where
     show t = concat (map show (convertMerkleTreeToList t))
@@ -69,3 +76,13 @@ amountMatch ins outs = fromIntegral (foldr (+) 0 ins) == fromIntegral (foldr f 0
     where
       f (TxOutput _ amount) acc = acc + amount
 
+verifyTX :: Crypto.Secp256k1.Ctx -> Transaction -> [MyPubKey] -> Bool
+verifyTX ctx tx pks =
+    verifyTXi tx pks
+    where
+        m = (fromJust . msg . takeHash) tx
+        verifyTXi (Transaction [] outputs []) [] = True
+        verifyTXi (Transaction (i:ins) outputs (s:sigs)) (p:pks) =
+            verifySig ctx pk si m && verifyTXi (Transaction ins outputs sigs) pks
+            where si = Sig s
+                  pk = processPubKeyToLib p
