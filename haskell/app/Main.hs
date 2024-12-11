@@ -57,70 +57,76 @@ lookupUTXO utxo hash = if (length l) == 0 then Nothing else Just (head l)
     where l = filter (\(UTXO (TxOutput _ _) u) -> hash == u) utxo
 
 getInputHashes :: [UTXO] -> [UTXO] -> IO ([UTXO])
-getInputHashes utxo acc =
-            runInputT defaultSettings $ do
-                input <- getInputLine ("Input Hash (EOF to end) [" ++ (show (length acc)) ++ "]: ")
-                case input of
-                    Just input_data ->
-                        case (lookupUTXO utxo (hexToByteString input_data)) of
-                            Just u -> do
-                                liftIO $ getInputHashes utxo (acc ++ [u])
-                            Nothing -> do
-                                liftIO $ putStrLn "Invalid hash: not in UTXO! Current UTXO:"
-                                liftIO $ putStrLn $ showUTXOs $ utxo
-                                liftIO $ getInputHashes utxo acc
-                    Nothing -> do
-                        return acc
+getInputHashes utxo acc = do
+     input <- liftIO $ getInputLineValidated ("Input Hash (EOF to end) [" ++ (show (length acc)) ++ "]: ")
+                                             validate
+                                             ferr
+     case input of
+         Just u ->
+             liftIO $ getInputHashes utxo (acc ++ [u])
+         Nothing -> do
+             return acc
+    where validate s =
+            if ((length s) == 64) then
+                (lookupUTXO utxo (hexToByteString s)) ||| [chkdup]
+            else
+                Nothing
+          ferr s = putStrLn ("Invalid UTXO output hash: " ++ s ++ "! Current UTXO:\n" ++ (showUTXOs utxo)) >> return True
+          chkdup (UTXO _ s) = (length (filter (\(UTXO _ hash) -> hash == s) acc)) == 0
 
 getOutputs :: Amount -> [TxOutput] -> IO ([TxOutput])
-getOutputs total acc =
-            runInputT defaultSettings $ do
-                let curamount = (sum (map txoToAmount acc))
-                let amountstr = "(" ++ (show curamount) ++ "/" ++ (show total) ++ ")"
-                input <- getInputLine ("Output Address (EOF to end) [" ++ (show (length acc)) ++ "] " ++ amountstr ++ ": ")
-                case input of
-                    Just input_data -> do
-                        input2 <- getInputLine ("Amount " ++ amountstr ++ ": ")
-                        case input2 of
-                            Just input_data2 ->
-                                    case (readMaybe input_data2) of
-                                        Just y -> do
-                                            liftIO $ getOutputs total (acc ++ [(TxOutput input_data y)])
-                                        Nothing -> do
-                                            liftIO $ putStrLn "Invalid amount"
-                                            liftIO $ getOutputs total acc
-                            Nothing ->
-                                liftIO $ getOutputs total acc
-                    Nothing -> do
-                        if curamount /= total then do
-                                liftIO $ putStrLn ("Total amount must be " ++ (show total) ++ "!")
-                                liftIO $ getOutputs total acc
-                        else
-                                return acc
+getOutputs total acc = do
+    input <- liftIO $ getInputLineValidated ("Output Address (EOF to end) [" ++ (show (length acc)) ++ "] " ++ amountstr ++ ": ")
+                                            validateAddr
+                                            ferrAddr
+    case input of
+        Just address -> do
+            input2 <- getInputLineValidated ("Amount " ++ amountstr ++ ": ")
+                                            validateAmount
+                                            ferrAmount
+            case input2 of
+                Just amount ->
+                    liftIO $ getOutputs total (acc ++ [(TxOutput address amount)])
+                Nothing ->
+                    liftIO $ getOutputs total acc
+        Nothing -> do
+            if curamount /= total then do
+                    liftIO $ putStrLn ("Total amount must be " ++ (show total) ++ "!")
+                    liftIO $ getOutputs total acc
+            else
+                    return acc
+    where validateAddr :: String -> Maybe String
+          validateAddr s =
+              if ((length s) == 34) && ((length (filter (\(TxOutput addr _) -> addr == s) acc)) == 0) then
+                  Just s
+              else
+                  Nothing
+          ferrAddr s = putStrLn ("Duplicate output address: " ++ s ++ "!") >> return True
+          validateAmount s = (readMaybe s) ||| [(\i -> i >= 0 && (curamount + i) <= total)]
+          ferrAmount s = putStrLn ("Invalid amount: " ++ s ++ "!") >> return True
+          curamount = (sum (map txoToAmount acc))
+          amountstr = "(" ++ (show curamount) ++ "/" ++ (show total) ++ ")"
 
 getKeys :: [UTXO] -> [(UTXO, MyPrivKey)] -> IO ([(UTXO, MyPrivKey)])
 getKeys [] acc = do return acc
-getKeys (utxo:us) acc =
-            runInputT defaultSettings $ do
-                liftIO $ putStrLn ("Enter the private key for the following UTXO to sign the transaction:\n" ++ (showUTXO utxo))
-                input <- getInputLine ("Private key (" ++ (show (length us)) ++ " remaining): ")
-                case input of
-                    Just k -> do
-                        liftIO $ getKeys us (acc ++ [(utxo, hexToByteString k)])
-                    Nothing -> do
-                        return acc
+getKeys (utxo:us) acc = do
+            liftIO $ putStrLn ("Enter the private key for the following UTXO to sign the transaction:\n" ++ (showUTXO utxo))
+            input <- getInputLineValidated ("Private key (" ++ (show (length us)) ++ " remaining): ")
+                                           validate
+                                           ferr
+            case input of
+                Just k -> do
+                    liftIO $ getKeys us (acc ++ [(utxo, hexToByteString k)])
+                Nothing -> do
+                    return acc
+    where validate s = if ((length s) == 64) then Just s else Nothing
+          ferr s = putStrLn ("Invalid private key: " ++ s) >> return True
 
 newUTXO :: Hash -> TxOutput -> UTXO
 newUTXO hash txo = UTXO txo bh
     where
         bs = B.pack ((B.unpack hash) ++ (B.unpack (takeHash txo)))
         bh = Crypto.Hash.SHA256.hash bs
-
-f (UTXO (TxOutput addr amount) hash) = addr
-g (TxOutput addr amount) = addr
-n (UTXO txo hash) = show txo
--- o (UTXO txo h) = byteStringToHex h
-o (UTXO txo h) = (show . length . B.unpack) h
 
 newTX :: [UTXO] -> IO (Maybe (Transaction, [UTXO]))
 newTX utxo = do
@@ -139,10 +145,6 @@ newTX utxo = do
             let inhash = Crypto.Hash.SHA256.hash (B.pack (concat (map B.unpack (map hash ins))))
             let out = map (\o -> newUTXO inhash o) outputs
             let tx = Transaction ins out []
-            liftIO $ putStrLn "114514"
-            liftIO $ putStrLn (g (head outputs))
-            liftIO $ putStrLn "1919810"
-            liftIO $ putStrLn (o (head out))
             liftIO $ putStrLn ("Creating and signing the following transaction:\n" ++ (show tx))
             combined <- liftIO $ getKeys inputs []
             let res = (tx, inputs)

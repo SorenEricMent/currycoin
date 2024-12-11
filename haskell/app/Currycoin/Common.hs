@@ -13,6 +13,9 @@ import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Conversion as BC
 import qualified Data.ByteString.UTF8 as BSU
 import Data.Bits (testBit)
+import Control.Monad.IO.Class (liftIO)
+import Control.Monad.State
+import System.Console.Haskeline
 
 type Hash = B.ByteString
 type Amount = Int
@@ -80,3 +83,27 @@ word8ToHex w = let hex = showHex w ""
                -- About helper is by ChatGPT, to create human readable hexdigit strings for better visuals.
                -- Note: Do NOT use those two function internally beside formatting output! All internal structures should be in ByteString
 
+getInputLineValidated :: String -> (String -> Maybe a) -> (String -> IO (Bool)) -> IO (Maybe a)
+getInputLineValidated prompt f ferr =
+            runInputT defaultSettings $ do
+                input <- getInputLine prompt
+                case input of
+                    Just input_data ->
+                        case (f input_data) of
+                            Just u -> do
+                                return (Just u)
+                            Nothing -> do
+                                retry <- liftIO $ ferr input_data
+                                if retry then do
+                                    liftIO $ getInputLineValidated prompt f ferr
+                                else do
+                                    return Nothing
+                    Nothing -> do
+                        return Nothing
+
+
+(|||) :: Maybe a -> [(a -> Bool)] -> Maybe a
+(|||) Nothing bs = Nothing
+(|||) (Just x) [] = Just x
+(|||) (Just x) (a:bs) | (a x)     = (|||) (Just x) bs
+                      | otherwise = Nothing
