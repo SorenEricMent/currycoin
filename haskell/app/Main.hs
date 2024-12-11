@@ -7,6 +7,7 @@ import Currycoin.Data.Key
 import Currycoin.Data.Transaction
 import Currycoin.Data.Block
 import Crypto.Secp256k1
+import Crypto.Hash.SHA256
 import Data.ByteString.Base58
 import Data.Maybe (listToMaybe, fromJust)
 import Data.List (intercalate, intersperse)
@@ -21,11 +22,12 @@ import Control.Monad.State
 import System.IO (hFlush, stdout)
 import System.Console.Haskeline
 import Data.Maybe (isNothing, fromJust)
+import Data.List
 
 data GlobalState = GlobalState {
     block :: [Block],
     txPool :: [Transaction],
-    utxo :: [(TxOutput, Hash)]
+    utxo :: [UTXO]
 }
 
 -- The Times 03/Jan/2009 Chancellor on brink of second bailout for banks
@@ -39,22 +41,22 @@ initialState = GlobalState {
 showTxPool :: [Transaction] -> String
 showTxPool txs = "Pending Transaction Pool: \n" ++ concat (intersperse "\n" (map show txs))
 
-showUTXO :: [(TxOutput, Hash)] -> String
-showUTXO utxo = intercalate "\n" (map singleOutputShow utxo)
-  where  -- Somehow using show causes an overlap in type
-    singleOutputShow :: (TxOutput, Hash) -> String
-    singleOutputShow ((TxOutput addr amount), hash) =
-        "Output Hash:\t" ++ byteStringToHex hash ++ "\n" ++
-        "Address:\t" ++ addr ++ "\n" ++
-        "Amount:\t\t" ++ show amount ++ "\n"
+showUTXO :: UTXO -> String
+showUTXO (UTXO (TxOutput addr amount) hash) =
+    "Output Hash:\t" ++ byteStringToHex hash ++ "\n" ++
+    "Address:\t" ++ addr ++ "\n" ++
+    "Amount:\t\t" ++ show amount
+
+showUTXOs :: [UTXO] -> String
+showUTXOs utxo = intercalate "\n" (map showUTXO utxo)
     
 type AppState = StateT GlobalState IO
 
-lookupUTXO :: [(TxOutput, Hash)] -> Hash -> Maybe (TxOutput, Hash)
+lookupUTXO :: [UTXO] -> Hash -> Maybe UTXO
 lookupUTXO utxo hash = if (length l) == 0 then Nothing else Just (head l)
-    where l = filter (\u -> hash == (snd u)) utxo
+    where l = filter (\(UTXO (TxOutput _ _) u) -> hash == u) utxo
 
-getInputHashes :: [(TxOutput, Hash)] -> [(TxOutput, Hash)] -> IO ([(TxOutput, Hash)])
+getInputHashes :: [UTXO] -> [UTXO] -> IO ([UTXO])
 getInputHashes utxo acc =
             runInputT defaultSettings $ do
                 input <- getInputLine ("Input Hash (EOF to end) [" ++ (show (length acc)) ++ "]: ")
@@ -65,32 +67,86 @@ getInputHashes utxo acc =
                                 liftIO $ getInputHashes utxo (acc ++ [u])
                             Nothing -> do
                                 liftIO $ putStrLn "Invalid hash: not in UTXO! Current UTXO:"
-                                liftIO $ putStrLn $ showUTXO $ utxo
+                                liftIO $ putStrLn $ showUTXOs $ utxo
                                 liftIO $ getInputHashes utxo acc
                     Nothing -> do
                         return acc
 
-getOutputs :: Integer -> [(Address, Integer)] -> IO ([(Address, Integer)])
+getOutputs :: Amount -> [TxOutput] -> IO ([TxOutput])
 getOutputs total acc =
             runInputT defaultSettings $ do
-                input <- getInputLine ("Output Address (EOF to end) [" ++ (show (length acc)) ++ "]: ")
+                let curamount = (sum (map txoToAmount acc))
+                let amountstr = "(" ++ (show curamount) ++ "/" ++ (show total) ++ ")"
+                input <- getInputLine ("Output Address (EOF to end) [" ++ (show (length acc)) ++ "] " ++ amountstr ++ ": ")
                 case input of
                     Just input_data -> do
-                        input2 <- getInputLine "Amount: "
+                        input2 <- getInputLine ("Amount " ++ amountstr ++ ": ")
                         case input2 of
                             Just input_data2 ->
                                     case (readMaybe input_data2) of
                                         Just y -> do
-                                            liftIO $ getOutputs total (acc ++ [(hexToByteString input_data, y)])
+                                            liftIO $ getOutputs total (acc ++ [(TxOutput input_data y)])
                                         Nothing -> do
                                             liftIO $ putStrLn "Invalid amount"
                                             liftIO $ getOutputs total acc
+                            Nothing ->
+                                liftIO $ getOutputs total acc
                     Nothing -> do
-                        if (sum (map snd acc)) /= total then do
+                        if curamount /= total then do
                                 liftIO $ putStrLn ("Total amount must be " ++ (show total) ++ "!")
                                 liftIO $ getOutputs total acc
                         else
                                 return acc
+
+getKeys :: [UTXO] -> [(UTXO, MyPrivKey)] -> IO ([(UTXO, MyPrivKey)])
+getKeys [] acc = do return acc
+getKeys (utxo:us) acc =
+            runInputT defaultSettings $ do
+                liftIO $ putStrLn ("Enter the private key for the following UTXO to sign the transaction:\n" ++ (showUTXO utxo))
+                input <- getInputLine ("Private key (" ++ (show (length us)) ++ " remaining): ")
+                case input of
+                    Just k -> do
+                        liftIO $ getKeys us (acc ++ [(utxo, hexToByteString k)])
+                    Nothing -> do
+                        return acc
+
+newUTXO :: Hash -> TxOutput -> UTXO
+newUTXO hash txo = UTXO txo bh
+    where
+        bs = B.pack ((B.unpack hash) ++ (B.unpack (takeHash txo)))
+        bh = Crypto.Hash.SHA256.hash bs
+
+f (UTXO (TxOutput addr amount) hash) = addr
+g (TxOutput addr amount) = addr
+n (UTXO txo hash) = show txo
+-- o (UTXO txo h) = byteStringToHex h
+o (UTXO txo h) = (show . length . B.unpack) h
+
+newTX :: [UTXO] -> IO (Maybe (Transaction, [UTXO]))
+newTX utxo = do
+    inputs <- liftIO $ getInputHashes utxo []
+    let inamount = sum (map (\(UTXO (TxOutput _ amount) _) -> fromIntegral amount) inputs)
+    if (length inputs == 0) then do
+        liftIO $ putStrLn "No hash input!"
+        return Nothing
+    else do
+        outputs <- liftIO $ getOutputs inamount []
+        if (length outputs == 0) then do
+            liftIO $ putStrLn "No outputs!"
+            return Nothing
+        else do
+            let ins = map (\(UTXO _ h) -> h) inputs
+            let inhash = Crypto.Hash.SHA256.hash (B.pack (concat (map B.unpack (map hash ins))))
+            let out = map (\o -> newUTXO inhash o) outputs
+            let tx = Transaction ins out []
+            liftIO $ putStrLn "114514"
+            liftIO $ putStrLn (g (head outputs))
+            liftIO $ putStrLn "1919810"
+            liftIO $ putStrLn (o (head out))
+            liftIO $ putStrLn ("Creating and signing the following transaction:\n" ++ (show tx))
+            combined <- liftIO $ getKeys inputs []
+            let res = (tx, inputs)
+            return (Just res)
 
 shell :: AppState ()
 shell = do
@@ -125,25 +181,28 @@ shell = do
                                 liftIO $ putStrLn "No block exists in the database."
                         liftIO $ evalStateT shell currentState
                     Just "new_tx" -> do
-                        -- new_state <- liftIO $ new_tx 3 ""
-                        input_list <- liftIO $ getInputHashes (utxo currentState) []
-                        if (length input_list == 0) then do
-                            liftIO $ putStrLn "No hash input!"
-                            liftIO $ evalStateT shell currentState
-                        else do
-                            outputs <- liftIO $ getOutputs (sum (map (\((TxOutput _ amount), _) -> fromIntegral amount) input_list)) []
-                            liftIO $ evalStateT shell currentState
+                        tx <- liftIO $ newTX (utxo currentState)
+                        case tx of
+                            Just ((Transaction inputs outputs signatures), inputUTXOs) -> do
+                                let newState = GlobalState {
+                                    block = (block currentState),
+                                    txPool = (txPool currentState) ++ [(Transaction inputs outputs signatures)],
+                                    utxo = (utxo currentState) \\ inputUTXOs
+                                                        }
+                                liftIO $ evalStateT shell newState
+                            Nothing -> do
+                                liftIO $ evalStateT shell currentState
                     Just "show_tx_pool" -> do
                         liftIO $ putStrLn (show $ txPool $ currentState)
                         liftIO $ evalStateT shell currentState
                     Just "show_utxo" -> do
-                        liftIO $ putStrLn $ showUTXO $ utxo currentState
+                        liftIO $ putStrLn $ showUTXOs $ utxo currentState
                         liftIO $ evalStateT shell currentState
                     Just "show_utxo_addr" -> do
                         case (words (input_data))!?1 of
                             Just x -> do
                                 liftIO $ putStrLn (x ++ " can spend the following outputs:")
-                                liftIO $ putStrLn (concat (intersperse "\n" (map show (filter (\((TxOutput addr _),_) -> addr == x) (utxo currentState)))))
+                                liftIO $ putStrLn (concat (intersperse "\n" (map show (filter (\(UTXO (TxOutput addr _)_) -> addr == x) (utxo currentState)))))
                                 liftIO $ evalStateT shell currentState
                             Nothing -> do
                                 liftIO $ putStrLn "Missing address to lookup."

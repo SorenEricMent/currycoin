@@ -102,7 +102,7 @@ mintBlock v f addr txs height prevHash additional =
     where
       amountTuple = (if (isNothing txs) then (0, 0) else (countTxMerkleTree (fromJust txs)))
       coinbaseOutput = TxOutput addr 100
-      coinbase = Transaction [] [(coinbaseOutput, getTXID coinbaseOutput (intToByteString $ fromInteger height))] []
+      coinbase = Transaction [] [(UTXO coinbaseOutput (getTXID coinbaseOutput (intToByteString $ fromInteger height)))] []
       template = (BlockTemplate v f (fromIntegral (fst amountTuple)) (fromIntegral (snd amountTuple)) coinbase txs additional)
       templateHash = takeHash template
       rootHash = (if (isNothing txs) then hashEmptyTree else (takeHash (fromJust txs)))
@@ -134,7 +134,7 @@ generateGenesis =
                    template)
         where
           genesisOutput = (TxOutput "1Curry58bkekKypHUv6wm82XDqnNzgsZNy" 100)
-          genesisTX = Transaction [] [(genesisOutput, getTXID genesisOutput (B.pack [0x0]))] [] -- No sig for coinbase
+          genesisTX = Transaction [] [(UTXO genesisOutput (getTXID genesisOutput (B.pack [0x0])))] [] -- No sig for coinbase
           template = BlockTemplate (B.pack [0x1]) flagConst 0 1 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks") 
           templateHash = takeHash template
           rootHash = hashEmptyTree

@@ -10,6 +10,7 @@ import qualified Data.ByteString.UTF8 as BSU
 
 type Address = B.ByteString
 type MyPubKey = BSU.ByteString
+type MyPrivKey = BSU.ByteString
 
 processPubKeyFromLib :: PubKey -> MyPubKey
 processPubKeyFromLib (PubKey bs) =
@@ -27,5 +28,6 @@ pubkeyToAddress pubkey =
       addChecksum :: B.ByteString -> B.ByteString
       addChecksum bs = B.append bs (B.take 4 (Crypto.Hash.SHA256.hash (Crypto.Hash.SHA256.hash bs)))
 
+genPrivateKey :: IO MyPrivKey
 genPrivateKey = Crypto.Hash.SHA256.hash <$> getEntropy 32
 

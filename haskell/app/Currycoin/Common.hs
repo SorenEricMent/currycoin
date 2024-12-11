@@ -9,6 +9,8 @@ import Data.Maybe (listToMaybe, fromJust)
 import Numeric (showHex, readHex)
 import Data.List (intercalate)
 import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
+import qualified Data.ByteString.Conversion as BC
 import qualified Data.ByteString.UTF8 as BSU
 import Data.Bits (testBit)
 
@@ -17,10 +19,17 @@ type Amount = Int
 type TxInput = Hash -- Previous spendable output
 data TxOutput = TxOutput String Amount -- Address and amount
     deriving (Eq)
+
 class Hashable a where
     serialize :: a -> B.ByteString
     takeHash :: a -> Hash
     takeHash = hash . serialize
+
+instance Hashable TxOutput where
+    serialize (TxOutput addr amount) = (hash . B.pack) (addrhs ++ amounths)
+        where
+            addrhs = (B.unpack . BSU.fromString) addr
+            amounths = (BL.unpack . BC.toByteString) amount
 
 instance Hashable String where
     serialize = BSU.fromString
@@ -29,11 +38,10 @@ instance Hashable B.ByteString where
     serialize a = a
 
 instance Show TxOutput where
-    show (TxOutput addr amount) = "To: " ++ addr ++ "\nAmount: " ++ (show amount) ++ "\n"
+    show (TxOutput addr amount) = addr ++ " (" ++ (show amount) ++ ")"
 
-instance {-# OVERLAPS #-} Show (TxOutput, Hash) where
-    show (out, hash) = show out ++ (byteStringToHex hash)
-    
+txoToAmount (TxOutput _ amount) = amount
+
 -- Helper function section
 (!?) :: [a] -> Int -> Maybe a
 xs !? n
