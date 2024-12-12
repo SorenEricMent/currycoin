@@ -115,13 +115,41 @@ The initial state is the state the program begin with, it consists of:
 - A staticly generated Genesis block
 - A empty transaction pool
 - A single UTXO, which is the coinbase, in amount 100 payed to `1Curry58bkekKypHUv6wm82XDqnNzgsZNy` (Our key-addr scheme completely resemble the Bitcoin definition!)
-- Note: The private key to the address is `3c01d5bc28498b875af9056b78699f73a3d68ea41c1c30650081ca1d470f87e0`
+- Note: The private key to the address is `3c01d5bc28498b875af9056b78699f73a3d68ea41c1c30650081ca1d470f87e0`, you can generate more with `new_address`
 
-#### Command: show\_height
-show\_height takes no parameter, it gives you the height of the blockchain, for the initial state with only the genesis: 1
+#### Command: height
+height takes no parameter, it gives you the height of the blockchain, for the initial state with only the genesis: 1
 
 #### Command: show\_utxo
 show\_utxo takes no parameter, it gives you the current UTXOs (Unspend transaction outputs), output hashes are unique, and they can only be spend once.
+
+#### Command: show\_utxo
+show\_utxo takes one parameter: address, it works the same as show\_utxo, but the utxo is filtered with the address.
+
+#### Command: show\_tx_pool
+show\_tx\_pool takes no parameter, it shows transactions that is published but not yet realized on blockchain
+
+#### Command: new\_address
+new\_address takes no parameter, it gives you a standard bitcoin (or Currycoin!) address, its public key and private key
+
+#### Command: help
+List commands available
+
+#### Command: mint\_block
+mint\_block takes one parameter: the miner. It mines (find the PoW) a new Block on the blockchain, which will include all the transactions in the transaction pool, UTXO will be accordingly updated - new coinbase's output and all transactions' outputs will be added into it. The new coinbase will be paied to the miner in the parameter.
+
+#### Command: new_tx
+Interactively creates a transaction to add into transaction pool, will accordingly remove the UTXO spent, it will ask you to input a list of UTXO to be spent, a list of payee output(address and amount), and finally ask you for every input's private key to sign the transaction. Self explainatory as it is interactive and takes no parameter.
+
+#### Command: verify\_tx
+verify\_tx takes three parameters: height, transaction's hash and public key, it verifies if a transaction's signature is valid.
+
+#### gen\_merkle\_proof
+gen\_merkle\_proof takes two parameters: height and transaction's hash, it generate the merkle proof of a transactions's inclusion in a block.
+
+#### prune
+prune takes one parameter: height, it makes a locally stored block to be pruned of its data (Block template) and only remains the relevant hashes.
+
 <!--
 As it is currently set up, editing works best if you first `cd` into the `haskell` subdirectory and open VS Code on that directory (`code .`). There is a `Makefile` with some helpful aliases, but you can also just use `stack` as normal.
 
