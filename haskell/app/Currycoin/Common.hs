@@ -11,7 +11,7 @@ import Data.List (intercalate)
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.Conversion as BC
-import qualified Data.ByteString.UTF8 as BSU
+import Data.ByteString.UTF8 (fromString)
 import Data.Bits (testBit)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.State
@@ -31,14 +31,15 @@ class Hashable a where
 instance Hashable TxOutput where
     serialize (TxOutput addr amount) = (hash . B.pack) (addrhs ++ amounths)
         where
-            addrhs = (B.unpack . BSU.fromString) addr
+            addrhs = (B.unpack . fromString) addr
             amounths = (BL.unpack . BC.toByteString) amount
 
 instance Hashable String where
-    serialize = BSU.fromString
+    serialize = fromString
 
 instance Hashable B.ByteString where
     serialize a = a
+    takeHash a = a
 
 instance Show TxOutput where
     show (TxOutput addr amount) = addr ++ " (" ++ (show amount) ++ ")"
@@ -58,9 +59,9 @@ hexToByteString hexStr
   | odd (length hexStr) = error "Invalid hex string: odd length"
   | otherwise = B.pack $ map (fst . head . readHex) (chunksOf 2 hexStr)
 
--- Convert Int to ByteString.UTF8
-intToByteString :: Int -> BSU.ByteString
-intToByteString n = BSU.fromString (show n)
+-- Convert Int to ByteString
+intToByteString :: Int -> B.ByteString
+intToByteString n = fromString (show n)
 
 -- Convert a bytestring to its last four bin digit, for flag display, helped by GPT
 lastFourBinaryDigits :: B.ByteString -> String
@@ -107,3 +108,4 @@ getInputLineValidated prompt f ferr =
 (|||) (Just x) [] = Just x
 (|||) (Just x) (a:bs) | (a x)     = (|||) (Just x) bs
                       | otherwise = Nothing
+

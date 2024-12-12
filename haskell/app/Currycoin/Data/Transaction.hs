@@ -9,7 +9,7 @@ import Currycoin.Common
 import Currycoin.Data.Key
 import Data.Maybe (fromJust)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as BSU
+import Data.ByteString.UTF8 (fromString)
 import Data.List (intersperse)
 
 data UTXO = UTXO TxOutput Hash
@@ -31,7 +31,7 @@ getOutput :: Transaction -> [UTXO]
 getOutput (Transaction _ r _) = r
 
 getTXID :: TxOutput -> Hash -> Hash
-getTXID (TxOutput addr amount) inHash = Crypto.Hash.SHA256.hash (B.concat [inHash, BSU.fromString addr, intToByteString $ fromIntegral amount])
+getTXID (TxOutput addr amount) inHash = Crypto.Hash.SHA256.hash (B.concat [inHash, fromString addr, intToByteString $ fromIntegral amount])
 
 instance Hashable Transaction where
     serialize (Transaction inputs outputTuples _) = B.concat (inputs ++ (map (\(UTXO _ hash) -> hash) outputTuples))  -- Signature shoule be added after the hash is computed

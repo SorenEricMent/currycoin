@@ -12,7 +12,7 @@ import Data.ByteString.Base58
 import Data.Maybe (listToMaybe, isNothing, fromJust)
 import Data.List (intercalate, intersperse)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as BSU
+import Data.ByteString.UTF8 (fromString)
 import Text.Read (readMaybe)
 
 import Currycoin.Data.MerkleTree
@@ -307,7 +307,7 @@ shell = do
                                 let prevBlock = (block currentState)!!(height-1) -- Previous block is guanranteed with genesis
                                 let prevHash = takeHash prevBlock
                                 let additionalList = snd (splitAt 2 (words (input_data)))
-                                let additional = (if (additionalList == []) then B.pack [0x0] else BSU.fromString $ unwords $ additionalList)
+                                let additional = (if (additionalList == []) then B.pack [0x0] else fromString $ unwords $ additionalList)
                                 liftIO $ putStrLn "Started mining!"
                                 let !newBlock = mintBlock (B.pack [0x1]) flagConst addr txsMaybe (fromIntegral height) prevHash additional
                                 let newState = GlobalState {
@@ -359,19 +359,20 @@ shell = do
                     Just "verify_merkle_proof" -> do
                         if (odd ((length $ words (input_data)) - 2))
                         then do
-                            let proof = processMerkleProofInput (tail (tail (tail (words input_data))))
-                            if (proof == Nothing)
-                            then do
-                                liftIO $ putStrLn "Invalid proof, notice to use 0 for left and 1 for right."
-                                liftIO $ evalStateT shell currentState
-                            else do
-                                if (proveHashableInclusion (hexToByteString ((words input_data)!!1)) (hexToByteString ((words input_data)!!2)) (fromJust proof))
-                                then do
-                                    liftIO $ putStrLn "Proof is valid"
+                            let rootHash = hexToByteString ((words input_data)!!1)
+                            let txHash = hexToByteString ((words input_data)!!2)
+                            case (processMerkleProofInput (tail (tail (tail (words input_data))))) of
+                                Nothing -> do
+                                    liftIO $ putStrLn "Invalid proof, notice to use 0 for left and 1 for right."
                                     liftIO $ evalStateT shell currentState
-                                else do
-                                    liftIO $ putStrLn "Proof is invalid"
-                                    liftIO $ evalStateT shell currentState
+                                Just proof -> do
+                                    if (proveHashableInclusion rootHash txHash proof)
+                                    then do
+                                        liftIO $ putStrLn "Proof is valid"
+                                        liftIO $ evalStateT shell currentState
+                                    else do
+                                        liftIO $ putStrLn "Proof is invalid"
+                                        liftIO $ evalStateT shell currentState
                         else do
                             liftIO $ putStrLn "Proof should be even number of parameters in 0(Left)1(Right) Hash"
                             liftIO $ evalStateT shell currentState

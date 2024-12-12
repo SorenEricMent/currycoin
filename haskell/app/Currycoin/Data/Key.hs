@@ -6,11 +6,11 @@ import Crypto.Secp256k1
 import Crypto.Hash.SHA256
 import Crypto.Hash.RIPEMD160
 import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as BSU
+import Data.ByteString.UTF8 (toString)
 
 type Address = B.ByteString
-type MyPubKey = BSU.ByteString
-type MyPrivKey = BSU.ByteString
+type MyPubKey = B.ByteString
+type MyPrivKey = B.ByteString
 
 processPubKeyFromLib :: PubKey -> MyPubKey
 processPubKeyFromLib (PubKey bs) =
@@ -35,4 +35,4 @@ genPrivateKey :: IO MyPrivKey
 genPrivateKey = Crypto.Hash.SHA256.hash <$> getEntropy 32
 
 addressToString :: Address -> String
-addressToString = BSU.toString
+addressToString = toString

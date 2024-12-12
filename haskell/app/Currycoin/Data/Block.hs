@@ -7,7 +7,7 @@ import Currycoin.Data.Transaction
 import Data.List (isPrefixOf)
 import Data.Maybe (fromJust, isNothing)
 import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as BSU
+import Data.ByteString.UTF8 (toString, fromString)
 
 type Version = B.ByteString
 type Flag = B.ByteString
@@ -83,7 +83,7 @@ instance Show Block where
         "Block Root Hash:\t\t" ++ (byteStringToHex rootHash) ++ "\n" ++
         "Included previous hash:\t\t" ++ (byteStringToHex prevHash) ++ "\n" ++
         "Block POW Hash:\t\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
-        "Block Nonce:\t\t\t\t" ++ (BSU.toString nonce) ++ "\n" ++
+        "Block Nonce:\t\t\t\t" ++ (toString nonce) ++ "\n" ++
         "Final Block Hash for chaining:\t" ++ byteStringToHex (takeHash (PrunedBlock templateHash rootHash prevHash nonce powHash)) ++ "\n"
     show (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional)) =
         "\ESC[36mLocally Stored Block\ESC[0m\n" ++
@@ -92,7 +92,7 @@ instance Show Block where
         "Included previous hash:\t\t" ++ (byteStringToHex prevHash) ++ "\n" ++
         "Block POW Hash:\t\t\t" ++ (byteStringToHex powHash) ++ "\n" ++
         "Final Block Hash for chaining:\t" ++ byteStringToHex (takeHash (FullBlock   templateHash rootHash prevHash nonce powHash (BlockTemplate version flag incr oucr coinbase txs additional))) ++ "\n" ++
-        "Block Nonce:\t\t\t" ++ (BSU.toString nonce) ++ "\n" ++
+        "Block Nonce:\t\t\t" ++ (toString nonce) ++ "\n" ++
         "Block Version:\t\t" ++ (byteStringToHex version) ++ "\n" ++
         "Block Flags:\t\t" ++ (lastFourBinaryDigits flag) ++ "\n" ++
         "Block Input Counter:\t" ++ (show incr) ++ "\n" ++
@@ -102,7 +102,7 @@ instance Show Block where
         "\ESC[36mRegular:\ESC[0m\n" ++ (show txs) ++ "\n" ++
         "\ESC[36mAdditional Data\ESC[0m\n" ++
         "Hex form: " ++ (byteStringToHex additional) ++ "\nConverted: \n" ++
-        (BSU.toString additional)
+        (toString additional)
         
 -- Block is either its merkle root(pruned), or fully stored with its version, flag and transactions
 difficulty :: Integer -> Integer
@@ -116,7 +116,7 @@ mining target nonce diff =
   where
     currentHash = hash (B.concat [target, intToByteString (fromIntegral nonce)])
 
-mintBlock :: Version -> Flag -> String -> (Maybe (MerkleTree Transaction)) -> Integer -> Hash -> BSU.ByteString -> Block -- Version, Flag, Address, tx to be included, height(for diff and coinbase), previous hash additional data
+mintBlock :: Version -> Flag -> String -> (Maybe (MerkleTree Transaction)) -> Integer -> Hash -> B.ByteString -> Block -- Version, Flag, Address, tx to be included, height(for diff and coinbase), previous hash additional data
 mintBlock v f addr txs height prevHash additional =
     (FullBlock templateHash rootHash prevHash nonce powHash template)
     where
@@ -155,7 +155,7 @@ generateGenesis =
         where
           genesisOutput = (TxOutput "1Curry58bkekKypHUv6wm82XDqnNzgsZNy" 100)
           genesisTX = Transaction [] [(UTXO genesisOutput (getTXID genesisOutput (B.pack [0x0])))] [] -- No sig for coinbase
-          template = BlockTemplate (B.pack [0x1]) flagConst 0 1 genesisTX Nothing (BSU.fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks") 
+          template = BlockTemplate (B.pack [0x1]) flagConst 0 1 genesisTX Nothing (fromString "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks") 
           templateHash = takeHash template
           rootHash = hashEmptyTree
           prevHash = hashEmptyTree

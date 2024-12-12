@@ -6,8 +6,9 @@
 module Currycoin.Data.MerkleTree where
 
 import Currycoin.Common
+import Crypto.Hash.SHA256
 import qualified Data.ByteString as B
-import qualified Data.ByteString.UTF8 as BSU
+import Data.ByteString.UTF8 (fromString)
 
 -- https://wiki.haskell.org/Data_declaration_with_constraint
 -- https://wiki.haskell.org/Generalised_algebraic_datatype
@@ -86,10 +87,10 @@ groupBy2 (a:b:xs) = (a, b) : groupBy2 xs
 createMerkleTreeFromListInternal :: [MerkleTree a] -> MerkleTree a
 createMerkleTreeFromListInternal [a] = a
 createMerkleTreeFromListInternal [a, b] = INode h a b
-    where h = takeHash (B.append (takeHash a) (takeHash b))
+    where h = hash (B.append (takeHash a) (takeHash b))
 createMerkleTreeFromListInternal as = w
     where w = createMerkleTreeFromListInternal p
-          p = map (\x -> INode (takeHash (B.append (takeHash (fst x)) (takeHash (snd x)))) (fst x) (snd x)) g
+          p = map (\x -> INode (hash (B.append (takeHash (fst x)) (takeHash (snd x)))) (fst x) (snd x)) g
           g = groupBy2 as
 
 createMerkleTreeFromList :: (Hashable a) => [a] -> MerkleTree a
@@ -148,28 +149,30 @@ testMerkleTree elements elementToProve = do
         Just proofPath -> do
             putStrLn $ "Inclusion Proof for element '" ++ elementToProve ++ "':"
             mapM_ (\(isRight, hash) -> putStrLn $ (if isRight then "Right: " else "Left:  ") ++ byteStringToHex hash) proofPath
-            let elementToProveBS = BSU.fromString elementToProve
             let rootHash = takeHash merkleTree
-            let isValid = proveHashableInclusion rootHash elementToProveBS proofPath
+            let isValid = proveHashableInclusion rootHash elementToProve proofPath
             putStrLn $ "Proof is valid: " ++ show isValid
 
 -- Verify the inclusion proof
 -- (Bool, Hash): Bool = True if the sibling is on the right, False if on the left
 proveHashableInclusion :: (Hashable a) =>
-                          Hash ->        -- Root hash
+                          Hash ->             -- Root hash
                           a ->                -- Element to prove
-                          [(Bool, Hash)] ->  -- Sibling hashes with left/right info
+                          [(Bool, Hash)] ->   -- Sibling hashes with left/right info
                           Bool
 proveHashableInclusion rootHash y proofPath =
-    let initialHash = takeHash y
-        finalHash = foldl combineHashes initialHash proofPath
-    in finalHash == rootHash
+  finalHash == rootHash
   where
+    initialHash :: B.ByteString
+    initialHash = takeHash y
     -- Combine the current hash with the sibling hash based on sibling position
+    finalHash :: B.ByteString
+    finalHash = foldl combineHashes initialHash proofPath
+    combineHashes :: Hash -> (Bool, Hash) -> B.ByteString
     combineHashes acc (isRight, siblingHash) =
         if isRight
-        then takeHash (B.append acc siblingHash)  -- Right sibling: append current hash first
-        else takeHash (B.append siblingHash acc)  -- Left sibling: append sibling hash first
+        then (hash (B.append acc siblingHash))  -- Right sibling: append current hash first
+        else (hash (B.append siblingHash acc))  -- Left sibling: append sibling hash first
 
 merkleProofPrettify :: [(Bool, Hash)] -> String
 merkleProofPrettify [] = "Sufficient empty (Presumbly only one element)."
