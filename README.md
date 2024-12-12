@@ -124,7 +124,7 @@ height takes no parameter, it gives you the height of the blockchain, for the in
 show\_utxo takes no parameter, it gives you the current UTXOs (Unspend transaction outputs), output hashes are unique, and they can only be spend once.
 
 #### Command: show\_utxo\_addr
-show\_utxo takes one parameter: address, it works the same as show\_utxo, but the utxo is filtered with the address.
+show\_utxo\_addr takes one parameter: address, it works the same as show\_utxo, but the utxo is filtered with the address.
 
 #### Command: show\_tx_pool
 show\_tx\_pool takes no parameter, it shows transactions that is published but not yet realized on blockchain
