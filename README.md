@@ -147,6 +147,8 @@ verify\_tx takes three parameters: height, transaction's hash and public key, it
 #### gen\_merkle\_proof
 gen\_merkle\_proof takes two parameters: height and transaction's hash, it generate the merkle proof of a transactions's inclusion in a block.
 
+#### verify\_merkle\_proof
+verify\_merkle\_proof takes three patameters: block root hash, transaction's hash to be proven, and the proofs, in the format of parameter list like 0 [Hash1] 1 [Hash2], where 0 stand for Left and 1 stand for right.
 #### prune
 prune takes one parameter: height, it makes a locally stored block to be pruned of its data (Block template) and only remains the relevant hashes.
 
