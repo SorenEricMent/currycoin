@@ -95,7 +95,11 @@ Examples of calling `testMerkleTree`
 
 
 #### Running Currycoin Shell (Not for PoC!)
-Simply execute `stack build`, if you want to inspect on our example functions, run `stack ghci`, if you want to enter the interactive terminal (Not yet in progress but will be in the actual phase of the project), run the executable from the build (`stack run`).
+
+> **Note**: Use `git submodule update --init` to fetch libsecp256k1 source code. This source code will be used automatically if libsecp256k1 is not installed in your local system.
+
+Simply execute `make build`, if you want to inspect on our example functions, run `make ghci`, if you want to enter the interactive terminal (Not yet in progress but will be in the actual phase of the project), run the executable from the build (`make run`).
+
 #### How to use the Currycoin shell
 For the final evaluation, you might want to use `stack run` for the Currycoin shell! This section is going to guide you to use it.
 

@@ -216,8 +216,8 @@ shell = do
                         liftIO $ putStrLn "show_utxo_addr address\t\t\tFilter UTXO by address"
                         liftIO $ putStrLn "mint_block address\t\t\tMine a block and send coinbase to the specific address"
                         liftIO $ putStrLn "verify_tx height hash pubkeys ...\tVerify a transaction"
-                        liftIO $ putStrLn "gen_merkle_proof Height TXHash ...\tGenerate a transactions' inclusion proof"
-                        liftIO $ putStrLn "gen_verify_proof Height [((L|R), Hash)] ...\tVerify the proof that a transaction is included"
+                        liftIO $ putStrLn "gen_merkle_proof height TXHash ...\tGenerate a transactions' inclusion proof"
+                        liftIO $ putStrLn "verify_merkle_proof RootHash TXHash [1|0 Hash] ...\tVerify the proof that a transaction is included"
                         liftIO $ putStrLn "prune Height ...\tPrune a block, does not change stored UTXO"
                         liftIO $ evalStateT shell currentState
                     Just "new_address" -> do
