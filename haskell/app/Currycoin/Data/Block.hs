@@ -54,9 +54,17 @@ instance Hashable BlockTemplate where
 data Block = PrunedBlock Hash Hash Hash B.ByteString Hash |
              FullBlock   Hash Hash Hash B.ByteString Hash BlockTemplate
 
+pruneBlock :: Block -> Block
+pruneBlock (FullBlock a b c d e _) = (PrunedBlock a b c d e)
+pruneBlock (PrunedBlock a b c d e) = (PrunedBlock a b c d e)
+
 getCoinbase :: Block -> Maybe Transaction
 getCoinbase (PrunedBlock _ _ _ _ _) = Nothing
 getCoinbase (FullBlock _ _ _ _ _ (BlockTemplate _ _ _ _ coinbase _ _)) = Just coinbase
+
+getTxTree :: Block -> Maybe (MerkleTree Transaction)
+getTxTree (FullBlock _ _ _ _ _ (BlockTemplate _ _ _ _ _ (Just mt) _)) = Just mt
+getTxTree (PrunedBlock _ _ _ _ _) = Nothing
 
 findTX :: Block -> Hash -> Maybe Transaction
 findTX (PrunedBlock _ _ _ _ _) _ = Nothing

@@ -170,3 +170,11 @@ proveHashableInclusion rootHash y proofPath =
         if isRight
         then takeHash (B.append acc siblingHash)  -- Right sibling: append current hash first
         else takeHash (B.append siblingHash acc)  -- Left sibling: append sibling hash first
+
+merkleProofPrettify :: [(Bool, Hash)] -> String
+merkleProofPrettify [] = "Sufficient empty (Presumbly only one element)."
+merkleProofPrettify paths = concat (map showPath paths)
+                            where showPath :: (Bool, Hash) -> String
+                                  showPath (isRight, nodeHash) =
+                                      (if isRight then "Right, " else "Left, ") ++
+                                      byteStringToHex nodeHash ++ "\n"

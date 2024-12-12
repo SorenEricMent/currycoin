@@ -48,7 +48,7 @@ instance Show Transaction where
         "Inputs: \n" ++ (inputsToString ins) ++ "\n" ++
         "Outputs: \n" ++ (outputsToString outs) ++ "\n" ++
         "Signatures: \n" ++ (sigsToString sigs) ++ "\n" ++
-        "Hash: " ++ (hashToString (Transaction ins outs sigs))
+        "Transaction Hash: " ++ (hashToString (Transaction ins outs sigs)) ++ "\n\n"
         where inputsToString [] = "- No inputs."
               inputsToString ins = concat (intersperse "\n" (map (\h -> "- " ++ byteStringToHex h) ins))
               outputsToString outs = concat (intersperse "\n" (map (\o -> "- " ++ show o) outs))

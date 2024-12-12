@@ -148,6 +148,21 @@ signTX ctx (Transaction inputs outputs signatures) kk =
           tx = (Transaction inputs outputs signatures)
           ms = (fromJust . msg . takeHash) tx
 
+processMerkleProofInput :: [String] -> Maybe [(Bool, Hash)]
+processMerkleProofInput [] = Just []
+processMerkleProofInput [a] = error "Impossible! Received odd proof even after prefiltering"
+processMerkleProofInput (a:b:rest) =
+    if (a == "0")
+    then (case (processMerkleProofInput rest) of
+              Just result -> Just ([(False, convertedHash)] ++ result)
+              Nothing -> Nothing)
+    else if (a == "1")
+    then (case (processMerkleProofInput rest) of
+              Just result -> Just ([(True, convertedHash)] ++ result)
+              Nothing -> Nothing)
+    else Nothing
+    where convertedHash = hexToByteString b
+
 newTX :: Crypto.Secp256k1.Ctx -> [UTXO] -> IO (Maybe (Transaction, [UTXO]))
 newTX ctx utxo = do
     inputs <- liftIO $ getInputHashes utxo []
@@ -201,6 +216,9 @@ shell = do
                         liftIO $ putStrLn "show_utxo_addr address\t\t\tFilter UTXO by address"
                         liftIO $ putStrLn "mint_block address\t\t\tMine a block and send coinbase to the specific address"
                         liftIO $ putStrLn "verify_tx height hash pubkeys ...\tVerify a transaction"
+                        liftIO $ putStrLn "gen_merkle_proof Height TXHash ...\tGenerate a transactions' inclusion proof"
+                        liftIO $ putStrLn "gen_verify_proof Height [((L|R), Hash)] ...\tVerify the proof that a transaction is included"
+                        liftIO $ putStrLn "prune Height ...\tPrune a block, does not change stored UTXO"
                         liftIO $ evalStateT shell currentState
                     Just "new_address" -> do
                         private_key <- liftIO $ genPrivateKey
@@ -296,10 +314,84 @@ shell = do
                                     block = (block currentState) ++ [newBlock],
                                     txPool = [],
                                     utxo = oldUTXO ++ (getOutput (fromJust (getCoinbase newBlock))) ++ (foldr (++) [] (map getOutput txs)) 
-                                                        }
+                                }
                                 liftIO $ evalStateT shell newState
                             Nothing -> do
                                 liftIO $ putStrLn "Missing miner address!"
+                                liftIO $ evalStateT shell currentState
+                    Just "gen_merkle_proof" -> do
+                        case (words (input_data))!?1 of
+                            Just height -> do
+                                case (words (input_data))!?2 of
+                                    Just txhash -> do
+                                        let targetBlockMaybe = (block currentState)!?((read height)-1)
+                                        case targetBlockMaybe of
+                                            Just targetBlock -> do
+                                                let targetTxMaybe = (findTX targetBlock (hexToByteString txhash))
+                                                case targetTxMaybe of
+                                                    Just targetTx -> do
+                                                        let treeMaybe = (getTxTree targetBlock)
+                                                        case treeMaybe of
+                                                            Just txtree -> do
+                                                                let proofMaybe = generateInclusionProof txtree targetTx
+                                                                case proofMaybe of
+                                                                    Just proof -> do
+                                                                        liftIO $ putStrLn $ merkleProofPrettify proof
+                                                                        liftIO $ evalStateT shell currentState
+                                                                    Nothing -> do
+                                                                        liftIO $ putStrLn "Failed to generate proof."
+                                                                        liftIO $ evalStateT shell currentState
+                                                            Nothing -> do
+                                                                liftIO $ putStrLn "Failed to generate proof: no Tx in block"
+                                                                liftIO $ evalStateT shell currentState
+                                                    Nothing -> do
+                                                        liftIO $ putStrLn "Failed to generate proof: tx not found"
+                                                        liftIO $ evalStateT shell currentState
+                                            Nothing -> do
+                                                liftIO $ putStrLn "Invalid height"
+                                                liftIO $ evalStateT shell currentState
+                                    Nothing -> do
+                                        liftIO $ putStrLn "Missing transaction hash."
+                                        liftIO $ evalStateT shell currentState
+                            Nothing -> do
+                                liftIO $ putStrLn "Missing height."
+                                liftIO $ evalStateT shell currentState
+                    Just "verify_merkle_proof" -> do
+                        if (odd ((length $ words (input_data)) - 2))
+                        then do
+                            let proof = processMerkleProofInput (tail (tail (tail (words input_data))))
+                            if (proof == Nothing)
+                            then do
+                                liftIO $ putStrLn "Invalid proof, notice to use 0 for left and 1 for right."
+                                liftIO $ evalStateT shell currentState
+                            else do
+                                if (proveHashableInclusion (hexToByteString ((words input_data)!!1)) (hexToByteString ((words input_data)!!2)) (fromJust proof))
+                                then do
+                                    liftIO $ putStrLn "Proof is valid"
+                                    liftIO $ evalStateT shell currentState
+                                else do
+                                    liftIO $ putStrLn "Proof is invalid"
+                                    liftIO $ evalStateT shell currentState
+                        else do
+                            liftIO $ putStrLn "Proof should be even number of parameters in 0(Left)1(Right) Hash"
+                            liftIO $ evalStateT shell currentState
+                    Just "prune" -> do
+                        case (words (input_data))!?1 of
+                            Just height -> do
+                                if ((read height) > (length $ block currentState))
+                                then do
+                                    liftIO $ putStrLn "Invalid height"
+                                    liftIO $ evalStateT shell currentState
+                                else do
+                                    let blockSplitTuple = splitAt ((read height) - 1) (block currentState)
+                                    let newState = GlobalState {
+                                        block = (fst blockSplitTuple) ++ [pruneBlock (head (snd blockSplitTuple))] ++ (tail $ snd $ blockSplitTuple),
+                                        txPool = txPool currentState,
+                                        utxo = utxo currentState
+                                    }
+                                    liftIO $ evalStateT shell newState
+                            Nothing -> do
+                                liftIO $ putStrLn "Missing height."
                                 liftIO $ evalStateT shell currentState
                     Just _        -> do
                         liftIO $ putStrLn "Unknown command"
