@@ -1,5 +1,3 @@
-# CPSC 312 Project
-
 # Currycoin
 
 Currycoin is a simple blockchain implemented in Haskell. It provides a set of interfaces for its user to test blockchain related actions like creating a transaction or mint a new block on a simple, locally stored, Bitcoin-esque blockchain.
