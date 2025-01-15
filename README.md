@@ -14,9 +14,9 @@ It is in such fulfillment as:
 
 Our team is:
 
-+ Jessie Zhong (student #50544220)
-+ Yunchuan Hu (student #90325788):  "Winslow Flandre"
-+ Yuteng Liang (student #56100415): "Yuuta"
++ Jessie Zhong 
++ Yunchuan Hu:  "Winslow Flandre"
++ Yuteng Liang: "Yuuta"
 
 We call ourselves: __Knights Of the Lambda Calculus__
 
